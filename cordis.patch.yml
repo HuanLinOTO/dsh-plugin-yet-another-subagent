@@ -1,0 +1,21 @@
+# Disable official tool-subagent (spawn path; this plugin takes over the
+# `subagent` tool name). The fork path (`tool-subagent-fork`, tool name
+# `subagent_fork`) is left intact — no name collision with this plugin's
+# single `subagent` tool, and fork delegation stays available to the model.
+- id: tool-subagent
+  disabled: true
+
+# Insert this plugin.
+- insert:
+    - id: yet-another-subagent
+      name: '@dsh-external/yet-another-subagent'
+      config:
+        profiles:
+          - id: general
+            label: General
+            model: { kind: 'auto' }
+            persona: { kind: 'inherit' }
+            toolFilter: { kind: 'none' }
+            maxDepth: 3
+            builtin: true
+        generalFixed: true

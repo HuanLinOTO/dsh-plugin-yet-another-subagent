@@ -1,0 +1,183 @@
+/* SubagentCard toolview: a proper card with border, padding, and rounded
+ * corners. Three display branches: running (spinner), continuable (live
+ * child stats), foreground completed (output preview).
+ *
+ * Every color resolves through a --dsw-alias-* token (no literal colors). */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+  transition: border-color 0.15s ease;
+}
+
+.card[data-clickable] {
+  cursor: pointer;
+}
+
+.card[data-clickable]:hover {
+  border-color: var(--dsw-alias-brand-primary);
+}
+
+/* ---- Header: state dot + title + state badge ---- */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.stateDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-caption);
+  transition: background 0.15s ease;
+}
+
+/* Running: pulsing brand-color dot */
+.card[data-state='running'] .stateDot,
+.card[data-state='child-running'] .stateDot {
+  background: var(--dsw-alias-brand-primary);
+  animation: dsh-ya-subagent-pulse 1.4s ease-in-out infinite;
+}
+
+/* Completed: success green */
+.card[data-state='completed'] .stateDot {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+/* Child idle: success green (turn done, conversation alive) */
+.card[data-state='child-idle'] .stateDot {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+@keyframes dsh-ya-subagent-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.title {
+  flex: 1 1 auto;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stateBadge {
+  flex: none;
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* Running / child-running: shimmer sweep over the state badge text,
+ * mirroring DSH's "Deep diving..." turn-status effect. The pill background
+ * is dropped so background-clip: text can show the gradient through the glyphs. */
+.card[data-state='running'] .stateBadge,
+.card[data-state='child-running'] .stateBadge {
+  padding: 0;
+  background: linear-gradient(
+    90deg,
+    var(--dsw-static-deepseek-500) 0%,
+    var(--dsw-static-deepseek-500) 40%,
+    var(--dsw-static-deepseek-200) 50%,
+    var(--dsw-static-deepseek-500) 60%,
+    var(--dsw-static-deepseek-500) 100%
+  );
+  background-position: 100% 0;
+  background-size: 250% 100%;
+  background-clip: text;
+  color: transparent;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: dsh-ya-subagent-shimmer 1.8s linear infinite;
+}
+
+@keyframes dsh-ya-subagent-shimmer {
+  to {
+    background-position: 0 0;
+  }
+}
+
+.card[data-state='completed'] .stateBadge,
+.card[data-state='child-idle'] .stateBadge {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+/* ---- Body: stats or output preview ---- */
+
+.body {
+  min-height: 18px;
+}
+
+.stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.activity {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.output {
+  display: block;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+/* ---- Footer: click hint ---- */
+
+.footer {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-dimmed);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card[data-state='running'] .stateDot,
+  .card[data-state='child-running'] .stateDot {
+    animation: none;
+  }
+  .card[data-state='running'] .stateBadge,
+  .card[data-state='child-running'] .stateBadge {
+    background-position: 0 0;
+    background-size: 100% 100%;
+    animation: none;
+  }
+}

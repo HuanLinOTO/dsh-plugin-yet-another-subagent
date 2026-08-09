@@ -1,0 +1,174 @@
+/* SubagentTreeView: a recursive tree of subagent children with live progress. */
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.rootHint {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  margin-bottom: 4px;
+}
+
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.childList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.node {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.row:hover {
+  border-color: var(--dsw-alias-brand-primary);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
+}
+
+/* Highlight the currently open session. */
+.row[data-current] {
+  border-color: var(--dsw-alias-brand-primary);
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.rowHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-caption);
+  transition: background 0.15s ease;
+}
+
+.row[data-state='running'] .dot {
+  background: var(--dsw-alias-brand-primary);
+  animation: dsh-ya-tree-pulse 1.4s ease-in-out infinite;
+}
+
+.row[data-state='idle'] .dot,
+.row[data-state='settled'] .dot {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+@keyframes dsh-ya-tree-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.label {
+  flex: 1 1 auto;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  flex: none;
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.row[data-state='running'] .badge {
+  padding: 0;
+  background: linear-gradient(
+    90deg,
+    var(--dsw-static-deepseek-500) 0%,
+    var(--dsw-static-deepseek-500) 40%,
+    var(--dsw-static-deepseek-200) 50%,
+    var(--dsw-static-deepseek-500) 60%,
+    var(--dsw-static-deepseek-500) 100%
+  );
+  background-position: 100% 0;
+  background-size: 250% 100%;
+  background-clip: text;
+  color: transparent;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: dsh-ya-tree-shimmer 1.8s linear infinite;
+}
+
+@keyframes dsh-ya-tree-shimmer {
+  to { background-position: 0 0; }
+}
+
+.rowStats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.activity {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row[data-state='running'] .dot {
+    animation: none;
+  }
+  .row[data-state='running'] .badge {
+    background-position: 0 0;
+    background-size: 100% 100%;
+    animation: none;
+  }
+}
