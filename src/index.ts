@@ -19,6 +19,9 @@
 
 import type { Context } from 'cordis'
 import z from 'schemastery'
+// Type import also triggers `declare module 'cordis'` merge for `ctx.agents`
+// and the typed `agent/created` event (via dsh-agent's declaration).
+import type { Agent } from '@deepseek-ai/dsh-agent'
 // Value import triggers `declare module 'cordis'` merge for `ctx.subagents`.
 import { assertSubagentMaxDepth } from '@deepseek-ai/dsh-subagent'
 import type { SubagentProvider } from '@deepseek-ai/dsh-subagent'
@@ -34,7 +37,7 @@ import {
 import type { YaSubagentConfig } from './types.ts'
 
 export const name = 'yet-another-subagent'
-export const inject = ['tools', 'subagents', 'sessionProjections', 'connection']
+export const inject = ['tools', 'subagents', 'agents', 'sessionProjections', 'connection']
 
 export type { SubagentProfile, YaSubagentConfig } from './types.ts'
 
@@ -120,30 +123,77 @@ export function apply(ctx: Context, config: Config): void {
   //    every sync. We mirror the official tool-subagent provider-lifecycle
   //    pattern: wait for `spawn` to appear, register when ready, dispose
   //    on removal.
-  let toolDisposer: (() => void) | undefined
-  const syncTools = (provider?: SubagentProvider): void => {
-    if (toolDisposer !== undefined) {
-      toolDisposer()
-      toolDisposer = undefined
+  //
+  //    Registration targets TWO planes because the web-app `standard` preset
+  //    mounts the official `tool-subagent` at the AGENT scope, and the tools
+  //    registry lets a scope's own registration shadow inherited (preset /
+  //    global) ones — a global-only `subagent` would lose to the preset's
+  //    official tool (observed: the model saw the official tool). So the tool
+  //    is ALSO registered per agent (into `agent.ctx`, the agent's own layer)
+  //    where it shadows the preset's. The global registration stays as the
+  //    global-view surface (`ctx.tools.schemas()` feeds the `tools.list` RPC)
+  //    and as a fallback for agents composed without a preset.
+  let globalToolDisposer: (() => void) | undefined
+  const perAgentTools = new Map<Agent, () => void>()
+  let spawnAvailable = false
+
+  const registerGlobal = (): void => {
+    if (globalToolDisposer !== undefined) {
+      globalToolDisposer()
+      globalToolDisposer = undefined
     }
+    globalToolDisposer = ctx.tools.register(buildTool(store.list(), ctx))
+  }
 
-    const spawn = provider ?? ctx.subagents.getProvider('spawn')
-    if (spawn === undefined) return // wait for the next provider-added event
+  const registerForAgent = (agent: Agent): void => {
+    if (perAgentTools.has(agent) || !spawnAvailable) return
+    // `agent.ctx.effect` owns the tool for the agent's lifetime: it unwinds
+    // with the agent and re-runs the cleanup on disposal.
+    const disposer = agent.ctx.effect(() => {
+      const disposeTool = agent.ctx.tools.register(buildTool(store.list(), ctx))
+      return () => {
+        disposeTool()
+        perAgentTools.delete(agent)
+      }
+    }, 'ya-subagent.subagent-tool()')
+    perAgentTools.set(agent, disposer)
+  }
 
-    toolDisposer = ctx.tools.register(buildTool(store.list(), ctx))
+  const disposeAllTools = (): void => {
+    if (globalToolDisposer !== undefined) {
+      globalToolDisposer()
+      globalToolDisposer = undefined
+    }
+    for (const [agent, disposer] of [...perAgentTools]) {
+      perAgentTools.delete(agent)
+      disposer()
+    }
+  }
+
+  const syncTools = (): void => {
+    disposeAllTools()
+    if (!spawnAvailable) return
+    registerGlobal()
+    for (const agent of ctx.agents.list()) registerForAgent(agent)
   }
   // Register listeners before checking presence so no synchronous change is missed.
+  ctx.on('agent/created', ({ agent }: { agent: Agent }) => {
+    registerForAgent(agent)
+  })
   ctx.on('subagent/provider-added', (provider: SubagentProvider) => {
-    if (provider.name === 'spawn' && toolDisposer === undefined) syncTools(provider)
+    if (provider.name !== 'spawn') return
+    spawnAvailable = true
+    syncTools()
   })
   ctx.on('subagent/provider-removed', (providerName: string) => {
-    if (providerName !== 'spawn' || toolDisposer === undefined) return
-    toolDisposer()
-    toolDisposer = undefined
+    if (providerName !== 'spawn') return
+    spawnAvailable = false
+    disposeAllTools()
   })
   const present = ctx.subagents.getProvider('spawn')
   if (present !== undefined) {
-    syncTools(present)
+    spawnAvailable = true
+    syncTools()
   } else {
     ctx.logger.info('subagent spawn provider not registered yet; profile tools will register when it appears')
   }

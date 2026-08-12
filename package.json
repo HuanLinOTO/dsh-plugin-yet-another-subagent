@@ -1,6 +1,6 @@
 {
   "name": "@dsh-external/yet-another-subagent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Configurable subagent profiles with web UI settings, real-time toolcall/token display, and click-to-navigate child sessions.",
   "private": true,
   "type": "module",
