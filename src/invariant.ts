@@ -5,7 +5,7 @@
  */
 
 /* jscpd:ignore-start */
-import type { Context } from 'cordis'
+import type { Context } from '@deepseek-ai/cordis'
 import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
 
 const PACKAGE_NAME = '@huanlin/dsh-plugin-yet-another-subagent'
@@ -16,7 +16,7 @@ export const name = 'yet-another-subagent-invariant'
 export const inject = ['invariants']
 
 /**
- * No runtime invariant: profile tools, the RPC interceptor, and the two
+ * No runtime invariant: profile tools, the dedicated RPC handler, and the two
  * projections are registry-owned registrations whose disposal is proven by
  * the HMR-safety spec. They emit no cordis events and own no cross-plugin
  * mutable state (the in-memory ProfileStore's lifetime is the plugin fiber).

@@ -1,5 +1,5 @@
 /**
- * RPC handler: profile list CRUD + tool list over `ctx.connection.rpc.intercept('/api', ...)`.
+ * RPC handler: profile list CRUD + tool list over a dedicated Connection RPC channel.
  *
  * Endpoints (all POST, payload shape noted):
  *   - `ya-subagent/profiles.list`   payload: {}                          → { profiles: SubagentProfile[] }
@@ -15,8 +15,8 @@
  * @module @huanlin/dsh-plugin-yet-another-subagent/rpc
  */
 
-import type { Context } from 'cordis'
-// Value import triggers `declare module 'cordis'` merge for `ctx.connection`.
+import type { Context } from '@deepseek-ai/cordis'
+// Type import triggers `declare module '@deepseek-ai/cordis'` merge for `ctx.connection`.
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type { RpcResult } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { SubagentProfile } from './types.ts'
@@ -50,12 +50,8 @@ export interface ProfileRemovePayload {
 /** All ya-subagent RPC endpoint result values. */
 export type YaSubagentValue = ProfileListResponse | ToolListResponse
 
-const ENDPOINT_PREFIX = 'ya-subagent/'
-
-/** Test whether one endpoint belongs to this plugin. */
-export function ownsEndpoint(endpoint: string): boolean {
-  return endpoint.startsWith(ENDPOINT_PREFIX)
-}
+/** Dedicated RPC channel owned by this plugin. */
+export const YA_SUBAGENT_RPC_CHANNEL = '/ya-subagent'
 
 /** Build an RPC ok branch. */
 function ok(value: YaSubagentValue): RpcResult<YaSubagentValue> {
@@ -68,28 +64,28 @@ function fail(message: string): RpcResult<YaSubagentValue> {
 }
 
 /**
- * Register the ya-subagent RPC interceptor on the host's `/api` channel.
- * Uses `ctx.inject(['connection'], ...)` so the interceptor installs when
- * the connection service is ready and rolls back automatically on fiber
- * disposal (the inner `owner.effect` owns cleanup).
+ * Register the ya-subagent RPC handler on its own channel.
+ *
+ * The shared `/api` channel already has exactly one interceptor: DSH's Typert
+ * gateway, which serves built-in endpoints such as `commands/execute` and
+ * `pluginInventory/list`. Connection rejects a second interceptor, so this
+ * plugin must use `rpc.handle()` rather than competing for `/api`.
  * @param ctx - host context.
  * @param store - profile store.
  */
 export function registerRpc(ctx: Context, store: ProfileStore): void {
-  ctx.logger.info('ya-subagent: connection service available, registering RPC interceptor')
+  ctx.logger.info(`ya-subagent: registering RPC handler on ${YA_SUBAGENT_RPC_CHANNEL} channel`)
   const connection = ctx.connection as {
       readonly rpc: {
-        readonly intercept: (
-          channel: '/api',
-          matches: (endpoint: string) => boolean,
+        readonly handle: (
+          channel: string,
           handler: (endpoint: string, payload: unknown, signal: AbortSignal) => Promise<RpcResult<unknown>>,
           options: { readonly authority: 'trusted-host' | 'loopback' },
         ) => unknown
       }
     }
-    connection.rpc.intercept(
-      '/api',
-      ownsEndpoint,
+    connection.rpc.handle(
+      YA_SUBAGENT_RPC_CHANNEL,
       async (endpoint, payload) => {
         switch (endpoint) {
           case 'ya-subagent/profiles.list':

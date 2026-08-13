@@ -19,9 +19,9 @@
  * deny is picked, populated from `ya-subagent/tools.list` (the host's current
  * `ctx.tools.schemas()`).
  *
- * Pulls the profile list once on mount via `connection.rpc.call('/api',
- * 'ya-subagent/profiles.list')`, dispatches add/update/remove through the
- * same RPC. The toolview slot is keyed by `subagent` and registered once at
+ * Pulls the profile list once on mount through the plugin's dedicated RPC
+ * channel, then dispatches add/update/remove through that same channel. The
+ * toolview slot is keyed by `subagent` and registered once at
  * plugin load, so profile mutations do not need to re-register slots.
  *
  * @module @huanlin/dsh-plugin-yet-another-subagent/client/SettingsPage
@@ -35,6 +35,7 @@ import { IconChevronDownOutline14, Menu, Modal, Pill } from '@deepseek-ai/dsh-cl
 import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SubagentProfile } from '../types.ts'
 import type { ProfileListResponse, ToolListResponse } from '../rpc.ts'
+import { YA_SUBAGENT_RPC_CHANNEL } from '../rpc.ts'
 import css from './SettingsPage.module.css'
 
 /** Inject face: RPC handle + locale translate. */
@@ -97,7 +98,7 @@ async function callRpc<T>(
   endpoint: string,
   payload: unknown,
 ): Promise<T> {
-  return rpc.call('/api', endpoint, payload) as Promise<T>
+  return rpc.call(YA_SUBAGENT_RPC_CHANNEL, endpoint, payload) as Promise<T>
 }
 
 /**
@@ -124,7 +125,7 @@ export function SettingsPage({ rpc, fetchProfiles, t }: SettingsPageProps) {
       const [list, toolsResult, modelsResult] = await Promise.all([
         fetchProfiles(),
         callRpc<ToolListResult>(rpc, 'ya-subagent/tools.list', {}),
-        callRpc<RpcResult<ModelCatalogResponse>>(rpc, 'llm.models', {}),
+        rpc.call('/api', 'llm.models', { args: {} }) as Promise<RpcResult<ModelCatalogResponse>>,
       ])
       setProfiles(list)
       setDrafts(list.map(p => ({ ...p })))

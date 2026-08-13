@@ -17,8 +17,8 @@
  * @module @huanlin/dsh-plugin-yet-another-subagent
  */
 
-import type { Context } from 'cordis'
-import z from 'schemastery'
+import type { Context } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
 // Type import also triggers `declare module 'cordis'` merge for `ctx.agents`
 // and the typed `agent/created` event (via dsh-agent's declaration).
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -217,9 +217,8 @@ export function apply(ctx: Context, config: Config): void {
   })
 
   // 3. RPC: profile list CRUD (mutations auto-persist through the scope).
-  //    `connection` is in the plugin's inject list, so `ctx.connection` is
-  //    directly available — no need for ctx.inject(['connection'], …).
-  ctx.logger.info('ya-subagent: registering RPC interceptor on /api channel')
+  //    Use the plugin's dedicated channel: `/api` has a single-interceptor
+  //    contract and is already owned by DSH's Typert gateway.
   registerRpc(ctx, store)
 
   // 4. Projections: parent-side `subagentProfile` + child-side `yaSubagentProgress`.

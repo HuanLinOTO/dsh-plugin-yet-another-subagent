@@ -26,6 +26,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { SubagentProfile } from '../types.ts'
 import type { ProfileListResponse } from '../rpc.ts'
+import { YA_SUBAGENT_RPC_CHANNEL } from '../rpc.ts'
 import { SubagentCard, type SubagentCardInjected } from './SubagentCard.tsx'
 import { SubagentTreeView, type SubagentTreeViewInjected } from './SubagentTreeView.tsx'
 import { SettingsPage, type YaSubagentSettingsInjected } from './SettingsPage.tsx'
@@ -67,7 +68,7 @@ export function apply(ctx: ClientContext): void {
     for (const p of profiles) profileLabels.set(p.id, p.label)
   }
   const fetchProfilesInternal = async (): Promise<readonly SubagentProfile[]> => {
-    const result = await connection.rpc.call('/api', 'ya-subagent/profiles.list', {}) as ProfileListResult
+    const result = await connection.rpc.call(YA_SUBAGENT_RPC_CHANNEL, 'ya-subagent/profiles.list', {}) as ProfileListResult
     return result.ok ? result.value.profiles : []
   }
   void fetchProfilesInternal().then(refreshProfileLabels).catch((error: unknown) => {
