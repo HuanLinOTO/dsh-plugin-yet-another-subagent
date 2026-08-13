@@ -14,7 +14,7 @@
  *     child) bridge the single-stage client runtime so SubagentCard can
  *     subscribe to live child progress.
  *
- * @module @dsh-external/yet-another-subagent
+ * @module @huanlin/dsh-plugin-yet-another-subagent
  */
 
 import type { Context } from 'cordis'
@@ -62,7 +62,7 @@ const SubagentProfileSchema = z.object({
     tools: z.array(z.string()).default([]),
   }).default({ kind: 'none', tools: [] }).description('Tool filter: none applies no filter; allow keeps only the named tools; deny removes them.'),
   maxDepth: z.natural().max(Number.MAX_SAFE_INTEGER).default(3).description('Maximum delegation depth (default 3).'),
-  backgroundMode: z.union(['continuable', 'one-shot']).default('continuable').description('Background policy: continuable keeps the child conversation (send_message); one-shot returns a task id (task_output/task_kill).'),
+  backgroundMode: z.union(['continuable', 'one-shot']).default('continuable').description('Background policy: continuable keeps the child conversation (send_message); one-shot returns a job id (job_output/job_kill).'),
   builtin: z.boolean().default(false).description('Whether this profile is part of the bundle seed (presentation hint only).'),
 })
 

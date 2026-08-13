@@ -5,7 +5,7 @@
  * where no settings provider is available (cordis.yml seed only, no
  * persistence).
  *
- * @module @dsh-external/yet-another-subagent/profile-store
+ * @module @huanlin/dsh-plugin-yet-another-subagent/profile-store
  */
 
 import type { SettingsScope } from '@deepseek-ai/dsh-settings'

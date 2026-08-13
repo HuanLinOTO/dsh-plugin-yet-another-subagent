@@ -1,7 +1,7 @@
 /**
  * Locale dictionaries for yet-another-subagent.
  *
- * @module @dsh-external/yet-another-subagent/client/locales
+ * @module @huanlin/dsh-plugin-yet-another-subagent/client/locales
  */
 
 /** All copy keys for the ya-subagent namespace. */

@@ -28,7 +28,7 @@
 
 - insert:
     - id: yet-another-subagent
-      name: '@dsh-external/yet-another-subagent'
+      name: '@huanlin/dsh-plugin-yet-another-subagent'
       config:
         profiles:
           - id: general
@@ -79,7 +79,7 @@ pnpm run build        # tsc + tsdown → lib/index.js, lib/invariant.js, lib/cli
 dsh plugin --profile web add "link:D:/Projects/deepseek-harness/yet-another-subagent"
 
 # 远端引用（分发/部署）
-dsh plugin --profile web add "github:dsh-external/yet-another-subagent"
+dsh plugin --profile web add "github:huanlinoto/dsh-plugin-yet-another-subagent"
 ```
 
 安装后重启 `dsh web` 进程，浏览器硬刷新（`Ctrl+Shift+R`）。

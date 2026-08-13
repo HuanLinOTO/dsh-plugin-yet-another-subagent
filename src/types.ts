@@ -1,7 +1,7 @@
 /**
  * Profile data model for yet-another-subagent.
  *
- * @module @dsh-external/yet-another-subagent/types
+ * @module @huanlin/dsh-plugin-yet-another-subagent/types
  */
 
 import type { AgentOptions } from '@deepseek-ai/dsh-agent'
@@ -45,8 +45,8 @@ export interface SubagentProfile {
    * (default, matches the base bundle) starts a background subagent that keeps
    * its conversation — the caller receives only its subagent id and sends more
    * work via `send_message`. `'one-shot'` starts a background task that returns
-   * a task id — the caller collects the result with `task_output` and stops it
-   * with `task_kill`.
+   * a job id — the caller collects the result with `job_output` and stops it
+   * with `job_kill`.
    */
   readonly backgroundMode: 'continuable' | 'one-shot'
   /**

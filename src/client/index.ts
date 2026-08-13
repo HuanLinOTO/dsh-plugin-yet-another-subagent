@@ -10,7 +10,7 @@
  *      card (SubagentCard). A single key covers all profiles because the
  *      tool name is always `subagent`; the profile is a call parameter.
  *
- * @module @dsh-external/yet-another-subagent/client
+ * @module @huanlin/dsh-plugin-yet-another-subagent/client
  */
 
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'

@@ -11,7 +11,7 @@
  *      one-shot child has completed; show "completed" with an output
  *      preview. No child session survives.
  *
- * @module @dsh-external/yet-another-subagent/client/SubagentCard
+ * @module @huanlin/dsh-plugin-yet-another-subagent/client/SubagentCard
  */
 
 import { useEffect, useState } from 'react'

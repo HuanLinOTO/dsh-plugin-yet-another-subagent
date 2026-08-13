@@ -8,7 +8,7 @@
  * Projections (`yaSubagentProgress`) are used additionally when a session
  * binding is available (current session + opened children) for richer data.
  *
- * @module @dsh-external/yet-another-subagent/client/SubagentTreeView
+ * @module @huanlin/dsh-plugin-yet-another-subagent/client/SubagentTreeView
  */
 
 import { useEffect, useState, useMemo } from 'react'

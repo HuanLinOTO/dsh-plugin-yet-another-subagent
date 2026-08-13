@@ -11,7 +11,8 @@
     "exactOptionalPropertyTypes": false,
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {}
   },
   "include": ["src"]
 }

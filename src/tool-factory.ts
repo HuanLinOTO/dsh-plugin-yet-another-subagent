@@ -15,7 +15,7 @@
  * Foreground (one-shot) path is kept for `run_in_background: false`; the
  * default is continuable background.
  *
- * @module @dsh-external/yet-another-subagent/tool-factory
+ * @module @huanlin/dsh-plugin-yet-another-subagent/tool-factory
  */
 
 import type { Context } from 'cordis'
@@ -27,7 +27,7 @@ import type { JsonValue } from '@deepseek-ai/dsh-session'
 // is typed. settleRun is reused by the foreground path.
 import { settleRun } from '@deepseek-ai/dsh-subagent'
 import type { SubagentProvider, SubagentResult, SubagentRun } from '@deepseek-ai/dsh-subagent'
-import type { TaskOutcome } from '@deepseek-ai/dsh-tasks'
+import type { JobOutcome } from '@deepseek-ai/dsh-jobs'
 import type { SubagentProfile } from './types.ts'
 import { agentOptionsFor, personaForRequest, toolFilterForRequest } from './types.ts'
 
@@ -69,7 +69,7 @@ function stopReasonError(result: SubagentResult): string | undefined {
 }
 
 /** Settle pending startup without rejecting the task producer contract. */
-async function settleStart(start: Promise<SubagentRun>, signal: AbortSignal): Promise<TaskOutcome> {
+async function settleStart(start: Promise<SubagentRun>, signal: AbortSignal): Promise<JobOutcome> {
   try {
     return await settleRun(await start)
   } catch (error: unknown) {
@@ -141,10 +141,10 @@ function buildDescription(profiles: readonly SubagentProfile[]): string {
     bgSuffix =
       ' Set `run_in_background: true` to start a background subagent. In continuable mode, it keeps its'
       + ' conversation and you receive only its subagent id (send more work with `send_message`). In'
-      + ' one-shot mode, you receive a task id (collect with `task_output`, stop with `task_kill`).'
+      + ' one-shot mode, you receive a job id (collect with `job_output`, stop with `job_kill`).'
       + ' The mode depends on the selected profile.'
   } else if (hasOneShot) {
-    bgSuffix = ' Set `run_in_background: true` to return a task id; collect with `task_output` and stop with `task_kill`.'
+    bgSuffix = ' Set `run_in_background: true` to return a job id; collect with `job_output` and stop with `job_kill`.'
   } else {
     bgSuffix =
       ' Set `run_in_background: true` to start a background subagent that keeps its conversation:'
@@ -161,11 +161,11 @@ function buildRunInBackgroundDescription(profiles: readonly SubagentProfile[]): 
   const hasOneShot = profiles.some(p => p.backgroundMode === 'one-shot')
   if (hasContinuable && hasOneShot) {
     return 'Run as a background subagent. In continuable mode, it keeps its conversation and you receive'
-      + ' only its subagent id (send more work with send_message). In one-shot mode, you receive a task'
-      + ' id (collect with task_output, stop with task_kill). The mode depends on the selected profile.'
+      + ' only its subagent id (send more work with send_message). In one-shot mode, you receive a job'
+      + ' id (collect with job_output, stop with job_kill). The mode depends on the selected profile.'
   }
   if (hasOneShot) {
-    return 'Run as a background task and return its id; collect with task_output or stop with task_kill.'
+    return 'Run as a background job and return its id; collect with job_output or stop with job_kill.'
   }
   return 'Run as a background subagent that keeps its conversation and return only its subagent id.'
     + ' This call never returns its result; send it more work with send_message.'
@@ -183,7 +183,7 @@ interface SubagentToolArgs {
  * Build the single model-facing `subagent` tool definition.
  *
  * @param profiles - the live profile list (drives the `profile` enum).
- * @param ctx - host context carrying `subagents` (and `tasks` for one-shot background).
+ * @param ctx - host context carrying `subagents` (and `jobs` for one-shot background).
  * @returns a `defineTool` definition ready for `ctx.tools.register`.
  */
 export function buildTool(profiles: readonly SubagentProfile[], ctx: Context) {
@@ -281,14 +281,14 @@ export function buildTool(profiles: readonly SubagentProfile[], ctx: Context) {
 
       if (args.run_in_background === true) {
         if (profile.backgroundMode === 'one-shot') {
-          // One-shot background: the child runs inside a Task; the caller
-          // receives a task id and collects the result with `task_output`.
+          // One-shot background: the child runs inside a Job; the caller
+          // receives a job id and collects the result with `job_output`.
           // Mirrors the official tool-subagent one-shot background path.
-          const tasks = ctx.get('tasks')
-          if (tasks === undefined) {
-            throw new Error('background tasks unavailable: load @deepseek-ai/dsh-tasks and @deepseek-ai/dsh-tool-tasks')
+          const jobs = ctx.get('jobs')
+          if (jobs === undefined) {
+            throw new Error('background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs')
           }
-          const id = tasks.start({
+          const id = jobs.start({
             kind: 'subagent',
             label: args.description,
             owner: parent,
@@ -328,7 +328,7 @@ export function buildTool(profiles: readonly SubagentProfile[], ctx: Context) {
         // (base bundle sets backgroundMode: continuable).
         const spawn = ctx.subagents.getProvider('spawn')
         if (spawn === undefined) {
-          throw new Error('subagent spawn provider not available; load @deepseek-ai/dsh-subagent-spawn')
+          throw new Error('subagent spawn provider not available; load @deepseek-ai/dsh-subagent-spawn-in-process')
         }
         if (spawn.prepareContinuable === undefined) {
           throw new Error('subagent spawn provider does not support continuable children')
@@ -379,4 +379,4 @@ export function buildTool(profiles: readonly SubagentProfile[], ctx: Context) {
 
 // Re-exports for the index module.
 export { settleStart }
-export type { SubagentProvider, SubagentResult, SubagentRun, TaskOutcome }
+export type { SubagentProvider, SubagentResult, SubagentRun, JobOutcome }

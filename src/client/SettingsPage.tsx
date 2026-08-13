@@ -24,7 +24,7 @@
  * same RPC. The toolview slot is keyed by `subagent` and registered once at
  * plugin load, so profile mutations do not need to re-register slots.
  *
- * @module @dsh-external/yet-another-subagent/client/SettingsPage
+ * @module @huanlin/dsh-plugin-yet-another-subagent/client/SettingsPage
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'

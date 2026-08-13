@@ -21,14 +21,14 @@ import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { basename, dirname, resolve as resolvePath } from 'node:path'
 
-const ID = '@dsh-external/yet-another-subagent'
+const ID = '@huanlin/dsh-plugin-yet-another-subagent'
 
 /** DSH platform modules that stay external in the browser bundle. */
 const CLIENT_EXTERNALS = [
   'react',
   'react-dom',
   'react/jsx-runtime',
-  'cordis',
+  '@deepseek-ai/cordis',
   '@deepseek-ai/dsh-client-runtime',
   '@deepseek-ai/dsh-client-runtime/client',
   '@deepseek-ai/dsh-client-locale',
@@ -43,8 +43,8 @@ const CLIENT_EXTERNALS = [
   '@deepseek-ai/dsh-client-ui-primitives',
   '@deepseek-ai/dsh-client-ui-conversation',
   '@deepseek-ai/dsh-client-ui-conversation/client',
-  '@deepseek-ai/dsh-client-ui-slash',
-  '@deepseek-ai/dsh-client-ui-slash/client',
+  '@deepseek-ai/dsh-client-ui-input-trigger',
+  '@deepseek-ai/dsh-client-ui-input-trigger/client',
   '@deepseek-ai/dsh-client-web-react',
 ]
 

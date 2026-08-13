@@ -1,14 +1,14 @@
 /**
- * Package-owned invariant companion for `@dsh-external/yet-another-subagent`.
+ * Package-owned invariant companion for `@huanlin/dsh-plugin-yet-another-subagent`.
  *
- * @module @dsh-external/yet-another-subagent/invariant
+ * @module @huanlin/dsh-plugin-yet-another-subagent/invariant
  */
 
 /* jscpd:ignore-start */
 import type { Context } from 'cordis'
 import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
 
-const PACKAGE_NAME = '@dsh-external/yet-another-subagent'
+const PACKAGE_NAME = '@huanlin/dsh-plugin-yet-another-subagent'
 
 /** Cordis companion plugin name. */
 export const name = 'yet-another-subagent-invariant'

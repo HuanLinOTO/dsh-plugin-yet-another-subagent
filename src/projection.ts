@@ -15,7 +15,7 @@
  * Both units are pure synchronous folds; the framework drives them and the
  * host wire layer ships the validated views.
  *
- * @module @dsh-external/yet-another-subagent/projection
+ * @module @huanlin/dsh-plugin-yet-another-subagent/projection
  */
 
 import { z } from 'zod'

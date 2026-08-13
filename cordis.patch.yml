@@ -8,7 +8,7 @@
 # Insert this plugin.
 - insert:
     - id: yet-another-subagent
-      name: '@dsh-external/yet-another-subagent'
+      name: '@huanlin/dsh-plugin-yet-another-subagent'
       config:
         profiles:
           - id: general

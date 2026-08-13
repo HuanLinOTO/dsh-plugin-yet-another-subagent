@@ -12,7 +12,7 @@
  * code with a descriptive message (the RpcError code union is closed; we do
  * not extend it for plugin-specific failures — see design doc §3.5).
  *
- * @module @dsh-external/yet-another-subagent/rpc
+ * @module @huanlin/dsh-plugin-yet-another-subagent/rpc
  */
 
 import type { Context } from 'cordis'
