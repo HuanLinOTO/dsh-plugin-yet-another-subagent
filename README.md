@@ -1,3 +1,5 @@
+本项目已被dshfind.com收录
+
 # yet-another-subagent
 
 可配置的子代理（subagent）profile 系统，提供单一 `subagent` 工具 + `profile` 参数选择，支持 Web UI 设置、实时进度展示（工具调用/token/活动）、子代理树标签页、点击跳转子会话。
@@ -10,7 +12,7 @@
   - 单一 `subagent` 工具，通过 `profile` 枚举参数选择 profile（非每 profile 一个工具）
   - 复用官方 `spawn` provider，支持前台（foreground）和后台（continuable / one-shot）两种模式
   - Profile 状态通过 settings seam 持久化到 `$DSH_HOME/settings.yaml`
-  - RPC CRUD：`ya-subagent/profiles.list` / `.add` / `.update` / `.remove`（共享 `/api` 通道）
+  - RPC CRUD：`profiles.list` / `.add` / `.update` / `.remove`（专用 `/ya-subagent` 通道，不共享 `/api`）
   - 两个 session projection：`subagentProfile`（父会话 childId→profileId 映射 + callId→childId）+ `yaSubagentProgress`（子会话实时 toolcall/token/活动状态）
 - **Client 半**（`src/client/index.ts`）：
   - `settings.section` — Profile 编辑页
@@ -107,16 +109,17 @@ Profile 状态通过 DSH settings seam 持久化到 `$DSH_HOME/settings.yaml` �
 
 ## RPC API
 
-Profile CRUD 走 host 的 `/api` 通道：
+Profile CRUD 走 host 的专用 `/ya-subagent` 通道（不共享 `/api`，避免与 Typert gateway 的单拦截器冲突）：
 
 | endpoint | payload | result (ok) |
 |----------|---------|-------------|
-| `ya-subagent/profiles.list` | `{}` | `{ profiles: SubagentProfile[] }` |
-| `ya-subagent/profiles.add` | `{ profile: SubagentProfile }` | `{ profiles: SubagentProfile[] }` |
-| `ya-subagent/profiles.update` | `{ profile: SubagentProfile }` | `{ profiles: SubagentProfile[] }` |
-| `ya-subagent/profiles.remove` | `{ id: string }` | `{ profiles: SubagentProfile[] }` |
+| `profiles.list` | `{}` | `{ profiles: SubagentProfile[] }` |
+| `profiles.add` | `{ profile: SubagentProfile }` | `{ profiles: SubagentProfile[] }` |
+| `profiles.update` | `{ profile: SubagentProfile }` | `{ profiles: SubagentProfile[] }` |
+| `profiles.remove` | `{ id: string }` | `{ profiles: SubagentProfile[] }` |
+| `tools.list` | `{}` | `{ tools: { name, description }[] }` |
 
-业务错误返回 `{ ok: false, error: { code: 'internal', message } }`。
+URL 形如 `POST /ya-subagent/profiles.list`。业务错误返回 `{ ok: false, error: { code: 'internal', message } }`。
 
 ## 已知限制
 
