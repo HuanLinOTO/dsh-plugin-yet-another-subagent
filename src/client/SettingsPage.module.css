@@ -461,6 +461,31 @@
   color: var(--dsw-alias-label-secondary);
 }
 
+/* Repair history block: a discrete action below the add-profile button. */
+.repairBlock {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* Repair result stats container. */
+.repairStats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Repair error list inside the result modal. */
+.repairErrorList {
+  margin: 8px 0 0;
+  padding: 0 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 .loading {
   padding: 12px;
   font-size: 14px;

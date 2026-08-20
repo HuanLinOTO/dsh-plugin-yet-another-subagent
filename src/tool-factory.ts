@@ -295,15 +295,15 @@ export function buildTool(profiles: readonly SubagentProfile[], ctx: Context) {
             run: () => {
               const controller = new AbortController()
               const start = ctx.subagents.start('spawn', { ...request, signal: controller.signal })
-              // Record the childId once the run starts so the client card
-              // can navigate to the child session while the task is running.
-              void start.then(run => {
-                parent.session.append('ya-subagent/started', {
-                  callId: exec.callId,
-                  childId: String(run.id),
-                  profileId: profile.id,
-                })
-              }).catch(() => {
+              // NOTE: previously appended a `ya-subagent/started` event here to
+              // surface the childId early. Removed: harness persistence refuses
+              // to load logs containing unknown event types unless marked
+              // ignorable, and `session.append` has no way to set that flag.
+              // The continuable/foreground branches embed the childId in the
+              // result text, so only the background one-shot card loses early
+              // childId resolution (degrades to "completed" display; the job
+              // itself runs unchanged — job_output/job_kill keep working).
+              void start.catch(() => {
                 // Startup failure: settleStart will report the task as failed.
               })
               return {
@@ -340,13 +340,8 @@ export function buildTool(profiles: readonly SubagentProfile[], ctx: Context) {
           request,
           signal: exec.signal,
         })
-        // Record the callId→childId mapping immediately so the client card
-        // can navigate to the child session before the tool result lands.
-        parent.session.append('ya-subagent/started', {
-          callId: exec.callId,
-          childId: started.childId,
-          profileId: profile.id,
-        })
+        // childId is embedded in the result text below; SubagentCard parses it
+        // directly (no projection event needed).
         return {
           kind: 'continuable' as const,
           subagentId: started.childId,
@@ -359,13 +354,8 @@ export function buildTool(profiles: readonly SubagentProfile[], ctx: Context) {
         ...request,
         signal: exec.signal,
       })
-      // Record the callId→childId mapping immediately so the client card
-      // can navigate to the child session while it is still running.
-      parent.session.append('ya-subagent/started', {
-        callId: exec.callId,
-        childId: String(run.id),
-        profileId: profile.id,
-      })
+      // childId (runId) is embedded in the result text below; SubagentCard
+      // parses it directly (no projection event needed).
       const result = await settleForegroundRun(run)
       return {
         kind: 'foreground' as const,

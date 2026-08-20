@@ -219,7 +219,7 @@ export function apply(ctx: Context, config: Config): void {
   // 3. RPC: profile list CRUD (mutations auto-persist through the scope).
   //    `connection` is in the plugin's inject list, so `ctx.connection` is
   //    directly available — no need for ctx.inject(['connection'], …).
-  ctx.logger.info('ya-subagent: registering RPC interceptor on /api channel')
+  ctx.logger.info('ya-subagent: registering RPC channel /ya-subagent')
   registerRpc(ctx, store)
 
   // 4. Projections: parent-side `subagentProfile` + child-side `yaSubagentProgress`.
