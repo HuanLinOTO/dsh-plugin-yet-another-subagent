@@ -464,8 +464,10 @@
 /* Repair history block: a discrete action below the add-profile button. */
 .repairBlock {
   margin-top: 8px;
-  display: flex;
-  justify-content: flex-start;
+}
+
+.repairBlock button {
+  width: 100%;
 }
 
 /* Repair result stats container. */
