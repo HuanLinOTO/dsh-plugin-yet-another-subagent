@@ -16,11 +16,11 @@
  * The persona field is a radio (inherit deployment persona vs custom text);
  * the textarea is shown only when custom. The tool filter is a select
  * (none / allow / deny); a multi-select dropdown is shown only when allow or
- * deny is picked, populated from `ya-subagent/tools.list` (the host's current
+ * deny is picked, populated from `tools.list` (the host's current
  * `ctx.tools.schemas()`).
  *
- * Pulls the profile list once on mount via `connection.rpc.call('/api',
- * 'ya-subagent/profiles.list')`, dispatches add/update/remove through the
+ * Pulls the profile list once on mount via `connection.rpc.call('/ya-subagent',
+ * 'profiles.list')`, dispatches add/update/remove through the
  * same RPC. The toolview slot is keyed by `subagent` and registered once at
  * plugin load, so profile mutations do not need to re-register slots.
  *
@@ -37,6 +37,15 @@ import type { SubagentProfile } from '../types.ts'
 import type { ProfileListResponse, ToolListResponse } from '../rpc.ts'
 import css from './SettingsPage.module.css'
 
+/** Wire shape of `sessions.repair` (mirrors `RepairStats` on the host). */
+interface RepairStats {
+  readonly scanned: number
+  readonly repaired: number
+  readonly skipped: number
+  readonly errors: readonly { readonly path: string; readonly message: string }[]
+}
+type RepairResult = RpcResult<RepairStats>
+
 /** Inject face: RPC handle + locale translate. */
 export interface YaSubagentSettingsInjected {
   readonly rpc: ClientConnectionRpc
@@ -52,7 +61,7 @@ type SettingsPageProps = PropsRuntime<'settings.section'> & PropsLocale<'ya-suba
 type ProfileListResult = RpcResult<ProfileListResponse>
 type ToolListResult = RpcResult<ToolListResponse>
 
-/** A tool entry returned by `ya-subagent/tools.list`. */
+/** A tool entry returned by `tools.list`. */
 interface ToolEntry {
   readonly name: string
   readonly description: string
@@ -97,7 +106,7 @@ async function callRpc<T>(
   endpoint: string,
   payload: unknown,
 ): Promise<T> {
-  return rpc.call('/api', endpoint, payload) as Promise<T>
+  return rpc.call('/ya-subagent', endpoint, payload) as Promise<T>
 }
 
 /**
@@ -116,6 +125,10 @@ export function SettingsPage({ rpc, fetchProfiles, t }: SettingsPageProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | undefined>(undefined)
   const [confirmDelete, setConfirmDelete] = useState<string | undefined>(undefined)
+  const [repairConfirmOpen, setRepairConfirmOpen] = useState(false)
+  const [repairRunning, setRepairRunning] = useState(false)
+  const [repairStats, setRepairStats] = useState<RepairStats | undefined>(undefined)
+  const [repairError, setRepairError] = useState<string | undefined>(undefined)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -123,8 +136,8 @@ export function SettingsPage({ rpc, fetchProfiles, t }: SettingsPageProps) {
     try {
       const [list, toolsResult, modelsResult] = await Promise.all([
         fetchProfiles(),
-        callRpc<ToolListResult>(rpc, 'ya-subagent/tools.list', {}),
-        callRpc<RpcResult<ModelCatalogResponse>>(rpc, 'llm.models', {}),
+        callRpc<ToolListResult>(rpc, 'tools.list', {}),
+        rpc.call('/api', 'llm.models', {}) as Promise<RpcResult<ModelCatalogResponse>>,
       ])
       setProfiles(list)
       setDrafts(list.map(p => ({ ...p })))
@@ -143,7 +156,7 @@ export function SettingsPage({ rpc, fetchProfiles, t }: SettingsPageProps) {
 
   const addProfile = useCallback(async () => {
     if (newDraft.id === '' || newDraft.label === '') return
-    const result = await callRpc<ProfileListResult>(rpc, 'ya-subagent/profiles.add', { profile: newDraft })
+    const result = await callRpc<ProfileListResult>(rpc, 'profiles.add', { profile: newDraft })
     if (result.ok) {
       setProfiles(result.value.profiles)
       setDrafts(result.value.profiles.map(p => ({ ...p })))
@@ -157,7 +170,7 @@ export function SettingsPage({ rpc, fetchProfiles, t }: SettingsPageProps) {
   }, [expanded, newDraft, rpc])
 
   const updateProfile = useCallback(async (draft: SubagentProfile) => {
-    const result = await callRpc<ProfileListResult>(rpc, 'ya-subagent/profiles.update', { profile: draft })
+    const result = await callRpc<ProfileListResult>(rpc, 'profiles.update', { profile: draft })
     if (result.ok) {
       setProfiles(result.value.profiles)
       setDrafts(result.value.profiles.map(p => ({ ...p })))
@@ -167,7 +180,7 @@ export function SettingsPage({ rpc, fetchProfiles, t }: SettingsPageProps) {
   }, [rpc])
 
   const removeProfile = useCallback(async (id: string) => {
-    const result = await callRpc<ProfileListResult>(rpc, 'ya-subagent/profiles.remove', { id })
+    const result = await callRpc<ProfileListResult>(rpc, 'profiles.remove', { id })
     if (result.ok) {
       setProfiles(result.value.profiles)
       setDrafts(result.value.profiles.map(p => ({ ...p })))
@@ -178,6 +191,24 @@ export function SettingsPage({ rpc, fetchProfiles, t }: SettingsPageProps) {
       setError(result.error.message)
     }
   }, [expanded, rpc])
+
+  const runRepair = useCallback(async () => {
+    setRepairConfirmOpen(false)
+    setRepairRunning(true)
+    setRepairError(undefined)
+    try {
+      const result = await callRpc<RepairResult>(rpc, 'sessions.repair', {})
+      if (result.ok) {
+        setRepairStats(result.value)
+      } else {
+        setRepairError(result.error.message)
+      }
+    } catch (err) {
+      setRepairError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setRepairRunning(false)
+    }
+  }, [rpc])
 
   const patchDraft = (id: string, patch: Partial<SubagentProfile>): void => {
     setDrafts(prev => prev.map(d => (d.id === id ? { ...d, ...patch } : d)))
@@ -245,6 +276,72 @@ export function SettingsPage({ rpc, fetchProfiles, t }: SettingsPageProps) {
           {t('page.add')}
         </button>
       )}
+      <div className={css.repairBlock}>
+        <button
+          type="button"
+          className={css.secondaryButton}
+          disabled={repairRunning}
+          onClick={() => setRepairConfirmOpen(true)}
+        >
+          {repairRunning ? t('repair.running') : t('repair.button')}
+        </button>
+      </div>
+      <Modal
+        open={repairConfirmOpen}
+        onClose={() => { setRepairConfirmOpen(false) }}
+        title={t('repair.confirm.title')}
+        footer={(
+          <>
+            <button type="button" className={css.secondaryButton} onClick={() => { setRepairConfirmOpen(false) }}>
+              {t('repair.confirm.cancel')}
+            </button>
+            <button
+              type="button"
+              className={css.primaryButton}
+              onClick={() => { void runRepair() }}
+            >
+              {t('repair.confirm.proceed')}
+            </button>
+          </>
+        )}
+      >
+        <p className={css.confirmText}>{t('repair.confirm.body')}</p>
+        <p className={css.confirmText}>{t('repair.confirm.warning')}</p>
+      </Modal>
+      <Modal
+        open={repairStats !== undefined || repairError !== undefined}
+        onClose={() => { setRepairStats(undefined); setRepairError(undefined) }}
+        title={t('repair.result.title')}
+        footer={(
+          <button
+            type="button"
+            className={css.secondaryButton}
+            onClick={() => { setRepairStats(undefined); setRepairError(undefined) }}
+          >
+            {t('repair.result.close')}
+          </button>
+        )}
+      >
+        {repairError !== undefined ? (
+          <p className={css.error}>{t('repair.error')}: {repairError}</p>
+        ) : repairStats !== undefined ? (
+          <div className={css.repairStats}>
+            <p className={css.confirmText}>{t('repair.result.scanned').replace('{n}', String(repairStats.scanned))}</p>
+            <p className={css.confirmText}>{t('repair.result.repaired').replace('{n}', String(repairStats.repaired))}</p>
+            <p className={css.confirmText}>{t('repair.result.skipped').replace('{n}', String(repairStats.skipped))}</p>
+            <p className={css.confirmText}>{t('repair.result.errors').replace('{n}', String(repairStats.errors.length))}</p>
+            {repairStats.errors.length > 0 && (
+              <ul className={css.repairErrorList}>
+                {repairStats.errors.map((e, i) => (
+                  <li key={i} className={css.confirmText}>
+                    {t('repair.result.errorEntry').replace('{path}', e.path).replace('{message}', e.message)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : null}
+      </Modal>
       <Modal
         open={confirmDelete !== undefined}
         onClose={() => { setConfirmDelete(undefined) }}

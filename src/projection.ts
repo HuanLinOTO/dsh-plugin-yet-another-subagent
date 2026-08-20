@@ -62,9 +62,11 @@ export const subagentProfileProjection: ProjectionDefinition<'subagentProfile', 
   stateVersion: 3,
   init: () => ({ pending: new Map(), mapping: {}, callToChild: {} }),
   apply: (state, event) => {
-    // `ya-subagent/started` is appended by the tool execute immediately after
-    // the child session is created, so the client card can resolve the childId
-    // before `tool/result` lands (while the subagent is still running).
+    // `ya-subagent/started` was historically appended by the tool execute to
+    // surface childId early. Writing it was removed (harness persistence
+    // refuses unknown event types without an ignorable flag that
+    // `session.append` cannot set), but the fold stays so logs written by
+    // older plugin versions still resolve childId for the client card.
     if (event.type === 'ya-subagent/started') {
       const { callId, childId, profileId } = event.data
       const nextMapping = { ...state.mapping, [childId]: profileId }

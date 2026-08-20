@@ -68,6 +68,21 @@ export type YaSubagentKey =
   | 'tree.state.running'
   | 'tree.state.idle'
   | 'tree.state.settled'
+  | 'repair.button'
+  | 'repair.confirm.title'
+  | 'repair.confirm.body'
+  | 'repair.confirm.warning'
+  | 'repair.confirm.cancel'
+  | 'repair.confirm.proceed'
+  | 'repair.running'
+  | 'repair.result.title'
+  | 'repair.result.scanned'
+  | 'repair.result.repaired'
+  | 'repair.result.skipped'
+  | 'repair.result.errors'
+  | 'repair.result.errorEntry'
+  | 'repair.result.close'
+  | 'repair.error'
 
 /** Locale namespace id. */
 export const NS = 'ya-subagent'
@@ -136,6 +151,21 @@ export const en: Record<YaSubagentKey, string> = {
   'tree.state.running': 'running',
   'tree.state.idle': 'idle',
   'tree.state.settled': 'settled',
+  'repair.button': 'Repair session history',
+  'repair.confirm.title': 'Repair session history?',
+  'repair.confirm.body': 'Scans every session log under $DSH_HOME/sessions and stamps "ignorable" on legacy ya-subagent/started events so the harness can load them again. Each modified file is backed up to .bak first.',
+  'repair.confirm.warning': 'If dsh is running, a session being written right now may conflict; prefer running this when no agent is active.',
+  'repair.confirm.cancel': 'Cancel',
+  'repair.confirm.proceed': 'Repair',
+  'repair.running': 'Repairing…',
+  'repair.result.title': 'Repair complete',
+  'repair.result.scanned': 'Scanned: {n}',
+  'repair.result.repaired': 'Repaired: {n}',
+  'repair.result.skipped': 'Skipped (already clean): {n}',
+  'repair.result.errors': 'Errors: {n}',
+  'repair.result.errorEntry': '{path}: {message}',
+  'repair.result.close': 'Close',
+  'repair.error': 'Repair failed',
 }
 
 /** Chinese dictionary. */
@@ -202,4 +232,19 @@ export const zh: Record<YaSubagentKey, string> = {
   'tree.state.running': '运行中',
   'tree.state.idle': '空闲',
   'tree.state.settled': '已结束',
+  'repair.button': '修复历史会话',
+  'repair.confirm.title': '修复历史会话？',
+  'repair.confirm.body': '将扫描 $DSH_HOME/sessions 下的所有会话日志，为遗留的 ya-subagent/started 事件补上 "ignorable" 标记，使 harness 能重新加载。每个被修改的文件会先备份为 .bak。',
+  'repair.confirm.warning': '若 dsh 正在运行，正在写入的会话可能冲突；建议在无活跃代理时执行。',
+  'repair.confirm.cancel': '取消',
+  'repair.confirm.proceed': '修复',
+  'repair.running': '修复中…',
+  'repair.result.title': '修复完成',
+  'repair.result.scanned': '扫描：{n}',
+  'repair.result.repaired': '已修复：{n}',
+  'repair.result.skipped': '跳过（已干净）：{n}',
+  'repair.result.errors': '错误：{n}',
+  'repair.result.errorEntry': '{path}：{message}',
+  'repair.result.close': '关闭',
+  'repair.error': '修复失败',
 }
