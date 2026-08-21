@@ -123,6 +123,38 @@ const cssModulesPlugin = {
   },
 }
 
+/** Peer deps that stay external in the node bundle (provided by the dsh host). */
+const NODE_EXTERNALS = [
+  'cordis',
+  'schemastery',
+  '@deepseek-ai/dsh-agent',
+  '@deepseek-ai/dsh-subagent',
+  '@deepseek-ai/dsh-session',
+  '@deepseek-ai/dsh-session-projection',
+  '@deepseek-ai/dsh-session-projection/types',
+  '@deepseek-ai/dsh-tools',
+  '@deepseek-ai/dsh-jobs',
+  '@deepseek-ai/dsh-llm',
+  '@deepseek-ai/dsh-settings',
+  '@deepseek-ai/dsh-invariants',
+  '@deepseek-ai/dsh-host-apiproxy',
+  '@deepseek-ai/dsh-host-apiproxy/api',
+  '@deepseek-ai/dsh-client-connection',
+  '@deepseek-ai/dsh-client-connection/client',
+  '@deepseek-ai/dsh-client-locale',
+  '@deepseek-ai/dsh-client-locale/client',
+  '@deepseek-ai/dsh-client-runtime',
+  '@deepseek-ai/dsh-client-runtime/client',
+  '@deepseek-ai/dsh-client-ui-slots',
+  '@deepseek-ai/dsh-client-ui-tool',
+  '@deepseek-ai/dsh-client-ui-tool/client',
+  '@deepseek-ai/dsh-client-ui-settings',
+  '@deepseek-ai/dsh-client-ui-settings/client',
+  '@deepseek-ai/dsh-client-ui-conversation',
+  '@deepseek-ai/dsh-client-ui-conversation/client',
+  '@deepseek-ai/dsh-client-ui-primitives',
+]
+
 const libConfig: UserConfig = {
   name: ID,
   entry: { index: 'src/index.ts', invariant: 'src/invariant.ts' },
@@ -132,6 +164,7 @@ const libConfig: UserConfig = {
   target: 'es2024',
   dts: false,
   clean: true,
+  external: NODE_EXTERNALS,
 }
 
 const clientBundleConfig: UserConfig = {

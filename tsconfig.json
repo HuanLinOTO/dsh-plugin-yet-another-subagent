@@ -11,8 +11,12 @@
     "exactOptionalPropertyTypes": false,
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
-    "types": ["node"],
-    "paths": {}
+    "typeRoots": [
+      "./node_modules/@types",
+      "../dsh/scripts/types",
+      "../dsh/node_modules/@types"
+    ],
+    "types": ["node"]
   },
   "include": ["src"]
 }

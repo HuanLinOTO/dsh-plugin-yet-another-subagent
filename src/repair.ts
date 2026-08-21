@@ -179,7 +179,7 @@ function patchPlaintextLines(text: string): { lines: string; changed: boolean } 
   let changed = false
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    if (line === '') continue
+    if (!line) continue
     if (!line.includes(TARGET_TYPE)) continue
     let parsed: unknown
     try {

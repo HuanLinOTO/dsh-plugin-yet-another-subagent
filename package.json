@@ -54,9 +54,10 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prebuild": "node scripts/relink-deps.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "test": "vitest run",
-    "build": "tsc -p tsconfig.json && tsdown -c tsdown.config.ts",
+    "build": "tsc -p tsconfig.typecheck.json && tsdown -c tsdown.config.ts",
     "bundle:client": "tsdown -c tsdown.config.ts"
   },
   "peerDependencies": {
