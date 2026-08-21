@@ -6,6 +6,7 @@
     "composite": false,
     "incremental": false,
     "declaration": true,
+    "emitDeclarationOnly": true,
     "declarationMap": false,
     "sourceMap": false,
     "exactOptionalPropertyTypes": false,
