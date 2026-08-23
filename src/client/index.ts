@@ -29,6 +29,7 @@ import type { ProfileListResponse } from '../rpc.ts'
 import { SubagentCard, type SubagentCardInjected } from './SubagentCard.tsx'
 import { SubagentTreeView, type SubagentTreeViewInjected } from './SubagentTreeView.tsx'
 import { SettingsPage, type YaSubagentSettingsInjected } from './SettingsPage.tsx'
+import { dicts } from './dictionaries.ts'
 import { en, NS, zh, type YaSubagentKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -50,6 +51,15 @@ type ProfileListResult = RpcResult<ProfileListResponse>
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ya-subagent: dictionaries')
+
+  // Opt-in third-language overrides through dsh-plugin-better-locale: an
+  // optional service, absent plugin means a plain no-op.
+  const betterLocale = ctx.get('betterLocale') as
+    | { register(ns: string, dicts: Record<string, Record<string, string>>): () => void }
+    | undefined
+  if (betterLocale) {
+    ctx.effect(() => betterLocale.register(NS, dicts), 'ya-subagent: better-locale override dicts')
+  }
 
   // `ctx.connection` is typed as HostConnectionHandle (host-side merge) when
   // the host connection package is also in the type graph; in a real client
