@@ -54,12 +54,29 @@ export function apply(ctx: ClientContext): void {
 
   // Opt-in third-language overrides through dsh-plugin-better-locale: an
   // optional service, absent plugin means a plain no-op.
-  const betterLocale = ctx.get('betterLocale') as
-    | { register(ns: string, dicts: Record<string, Record<string, string>>): () => void }
-    | undefined
-  if (betterLocale) {
-    ctx.effect(() => betterLocale.register(NS, dicts), 'ya-subagent: better-locale override dicts')
-  }
+  // Activation-order-safe: ctx.get('betterLocale') is a non-reactive read, so
+  // if better-locale activates after us, the initial read returns undefined.
+  // We subscribe to ctx.locale — better-locale bumps its revision on activation
+  // (persisted override) and on every override switch — and re-check on each bump.
+  ctx.effect(() => {
+    let dispose: (() => void) | undefined
+    const sync = (): void => {
+      dispose?.()
+      dispose = undefined
+      const store = ctx.get('betterLocale') as
+        | { register(ns: string, dicts: Record<string, Record<string, string>>): () => void }
+        | undefined
+      if (store !== undefined) {
+        dispose = store.register(NS, dicts)
+      }
+    }
+    sync()
+    const unsubscribe = ctx.locale.subscribe(sync)
+    return () => {
+      unsubscribe()
+      dispose?.()
+    }
+  }, 'ya-subagent: better-locale override dicts')
 
   // `ctx.connection` is typed as HostConnectionHandle (host-side merge) when
   // the host connection package is also in the type graph; in a real client
