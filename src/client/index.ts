@@ -135,12 +135,15 @@ export function apply(ctx: ClientContext): void {
     sessions: ctx.sessions as unknown as SubagentCardInjected['sessions'],
     profileLabelOf: (id: string) => profileLabels.get(id),
   })
-  ctx.effect(() => ctx.slots.register({
+  // Registered through slots.inject: the slot is declared by the ui-tool
+  // `conversation.chat.node` entry's children table, so a bare register
+  // races its declaration commit and fails boot when we apply first.
+  ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
     name: 'tool.call.toolview',
     key: 'subagent',
     locale: NS,
     inject: cardInjected,
-  }, SubagentCard), 'ya-subagent: subagent toolview')
+  }, SubagentCard))
 
   // ---- Profile list fetch for SettingsPage ------------------------------
   const fetchProfiles = fetchProfilesInternal
