@@ -51,6 +51,8 @@ export interface YaSubagentSettingsInjected {
   readonly rpc: ClientConnectionRpc
   /** Refetch the profile list from the host. */
   readonly fetchProfiles: () => Promise<readonly SubagentProfile[]>
+  /** Refetch the routable model catalog (provider groups); undefined on failure. */
+  readonly fetchModelCatalog: () => Promise<ModelCatalogData | undefined>
   /** Bound locale translator for the ya-subagent namespace. */
   readonly t: (key: string) => string
 }
@@ -81,10 +83,9 @@ interface ModelGroup {
   readonly models: readonly ModelEntry[]
 }
 
-/** Shape returned by the `llm.models` RPC. */
-interface ModelCatalogResponse {
+/** Model catalog wire shape (mirror of the host `ModelCatalog` read face). */
+interface ModelCatalogData {
   readonly groups: readonly ModelGroup[]
-  readonly failures: readonly { readonly id: string; readonly name: string; readonly message: string }[]
 }
 
 /** Default shape for a brand-new draft (before the user fills in id/label). */
@@ -114,7 +115,7 @@ async function callRpc<T>(
  * @param props - settings.section runtime share + locale + inject.
  * @returns the page element.
  */
-export function SettingsPage({ rpc, fetchProfiles, t }: SettingsPageProps) {
+export function SettingsPage({ rpc, fetchProfiles, fetchModelCatalog, t }: SettingsPageProps) {
   const [profiles, setProfiles] = useState<readonly SubagentProfile[]>([])
   const [drafts, setDrafts] = useState<readonly SubagentProfile[]>([])
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
@@ -134,23 +135,23 @@ export function SettingsPage({ rpc, fetchProfiles, t }: SettingsPageProps) {
     setLoading(true)
     setError(undefined)
     try {
-      const [list, toolsResult, modelsResult] = await Promise.all([
+      const [list, toolsResult, catalog] = await Promise.all([
         fetchProfiles(),
         callRpc<ToolListResult>(rpc, 'tools.list', {}),
-        rpc.call('/api', 'llm.models', {}) as Promise<RpcResult<ModelCatalogResponse>>,
+        fetchModelCatalog().catch(() => undefined),
       ])
       setProfiles(list)
       setDrafts(list.map(p => ({ ...p })))
       if (toolsResult.ok) setToolList(toolsResult.value.tools)
       else setToolList([])
-      if (modelsResult.ok) setModelGroups(modelsResult.value.groups)
+      if (catalog !== undefined) setModelGroups(catalog.groups)
       else setModelGroups([])
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }
-  }, [fetchProfiles, rpc])
+  }, [fetchProfiles, fetchModelCatalog, rpc])
 
   useEffect(() => { void refresh() }, [refresh])
 
@@ -290,6 +291,7 @@ export function SettingsPage({ rpc, fetchProfiles, t }: SettingsPageProps) {
         open={repairConfirmOpen}
         onClose={() => { setRepairConfirmOpen(false) }}
         title={t('repair.confirm.title')}
+        closeLabel={t('common.close')}
         footer={(
           <>
             <button type="button" className={css.secondaryButton} onClick={() => { setRepairConfirmOpen(false) }}>
@@ -312,6 +314,7 @@ export function SettingsPage({ rpc, fetchProfiles, t }: SettingsPageProps) {
         open={repairStats !== undefined || repairError !== undefined}
         onClose={() => { setRepairStats(undefined); setRepairError(undefined) }}
         title={t('repair.result.title')}
+        closeLabel={t('common.close')}
         footer={(
           <button
             type="button"
@@ -346,6 +349,7 @@ export function SettingsPage({ rpc, fetchProfiles, t }: SettingsPageProps) {
         open={confirmDelete !== undefined}
         onClose={() => { setConfirmDelete(undefined) }}
         title={t('row.delete.confirm')}
+        closeLabel={t('common.close')}
         footer={(
           <>
             <button type="button" className={css.secondaryButton} onClick={() => { setConfirmDelete(undefined) }}>

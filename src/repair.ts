@@ -1,15 +1,27 @@
 /**
- * One-shot session-log repair: stamp `"ignorable": true` onto legacy
- * `ya-subagent/started` events so the harness persistence read path
- * (`assertEventsSupported`) will skip them instead of refusing the whole log.
+ * One-shot session-log repair: physically REMOVE legacy `ya-subagent/started`
+ * event rows so the harness persistence read path (`assertEventsSupported`)
+ * loads the log again.
  *
- * Background: older plugin versions wrote `ya-subagent/started` via
- * `session.append(...)`, but `session.append` cannot set the `ignorable`
- * envelope flag, and `KNOWN_SESSION_EVENT_TYPES` is code-generated with no
- * plugin registration surface. The read path therefore refuses any log
- * containing the type unless each occurrence carries `ignorable: true`.
- * This module rewrites on-disk artifacts in place (after a `.bak` backup) to
- * add that flag to every `ya-subagent/started` row missing it.
+ * Background: plugin versions ≤0.1.2 appended `ya-subagent/started` via
+ * `session.append(...)`. `KNOWN_SESSION_EVENT_TYPES` is code-generated with no
+ * plugin registration surface, and v0.1.2-alpha.1 refuses EVERY log row whose
+ * type is outside that set — the old `ignorable` envelope flag no longer
+ * exists, so stamping it (the ≤0.1.5 repair) cannot help. The only repair is
+ * removal.
+ *
+ * Rows cannot simply be deleted: the read path enforces contiguous `seq`
+ * numbers. This module therefore rewrites the log in place (after a `.bak`
+ * backup):
+ *
+ *   - drops every `ya-subagent/started` row;
+ *   - decrements the `seq` of every later ordinary event row (packed
+ *     `text-chunks` / `reasoning-chunks` / `tool-call-chunks` storage rows
+ *     shift their `seq0` instead);
+ *   - shifts every `sourceEventSeqs` citation by the number of dropped rows
+ *     ahead of it (dropped rows are never cited: only surface events carry
+ *     provenance and they cite assistant chunks / surface nodes, which a
+ *     plugin row never is).
  *
  * Two physical encodings (mirrors `session-persistence-jsonl`):
  *   - `.jsonl`        — plaintext, one JSON record per line.
@@ -17,12 +29,17 @@
  *                       frame holds the session header line, subsequent
  *                       frames each hold one append batch of event lines.
  *                       Each frame is independently decodable + checksummed.
- *                       Only frames whose decoded plaintext contains a target
- *                       row are recompressed; untouched frames are copied
- *                       verbatim so byte-identity is preserved where possible.
+ *                       The first frame containing a dropped row and every
+ *                       frame after it are recompressed (their rows renumber);
+ *                       untouched earlier frames are copied verbatim.
  *
- * Idempotent: rows already carrying `ignorable: true` are skipped; files with
- * no target rows are left untouched (no backup, no rewrite).
+ * Modified rows are re-encoded with `JSON.stringify`, which reproduces the
+ * write path's canonical single-line form and preserves the parsed key order;
+ * untouched lines stay byte-identical.
+ *
+ * Idempotent: a log with no target rows is left untouched (no backup, no
+ * rewrite). A corrupt (unparsable) line is left untouched — that is the
+ * harness's refusal job, not ours.
  *
  * @module @huanlin/dsh-plugin-yet-another-subagent/repair
  */
@@ -34,6 +51,9 @@ import { join } from 'node:path'
 /** The event type this module targets. */
 const TARGET_TYPE = 'ya-subagent/started'
 
+/** Packed chunk-run storage row tags (their span start rides `seq0`). */
+const CHUNK_ROW_TYPES = new Set(['text-chunks', 'reasoning-chunks', 'tool-call-chunks'])
+
 /** Zstandard magic number (little-endian 0xFD2FB528). */
 const ZSTD_MAGIC = 0xFD2FB528
 
@@ -44,9 +64,9 @@ const CHECKSUM_OPTIONS = { params: { [constants.ZSTD_c_checksumFlag]: 1 } }
 export interface RepairStats {
   /** Session log files examined (`.jsonl` + `.jsonl.zstd`). */
   readonly scanned: number
-  /** Files rewritten because at least one target row was patched. */
+  /** Files rewritten because at least one target row was removed. */
   readonly repaired: number
-  /** Files with no patchable rows (already clean or no target events). */
+  /** Files with no target rows (already clean). */
   readonly skipped: number
   /** Per-file errors (path + message); empty on a clean run. */
   readonly errors: readonly { readonly path: string; readonly message: string }[]
@@ -130,18 +150,18 @@ export async function repairSessions(sessionsRoot: string): Promise<RepairStats>
  */
 async function repairPlaintextFile(path: string): Promise<FileOutcome> {
   const raw = await readFile(path, 'utf8')
-  const { lines, changed } = patchPlaintextLines(raw)
-  if (!changed) return { kind: 'clean' }
+  const lines = stripLegacyRows(raw, [])
+  if (lines === raw) return { kind: 'clean' }
   await ensureBackup(path)
   return { kind: 'repaired', bytes: Buffer.from(lines, 'utf8') }
 }
 
 /**
  * Repair one `.jsonl.zstd` concatenated-frame file. The header frame is
- * decoded to check for a target row (current harness writes the header as its
- * own frame, so a target there is theoretically possible but unlikely); event
- * frames are decoded and patched individually. Only frames with a patch are
- * recompressed; untouched frames are copied verbatim.
+ * decoded but never carries event rows; once a dropped row is found, that
+ * frame and every later frame are renumbered and recompressed (later rows'
+ * seqs shift even when their own text is otherwise unchanged). Frames before
+ * the first change are copied verbatim.
  */
 async function repairZstdFile(path: string): Promise<FileOutcome> {
   const buffer = await readFile(path)
@@ -149,12 +169,13 @@ async function repairZstdFile(path: string): Promise<FileOutcome> {
   if (frames.length === 0) return { kind: 'clean' }
 
   const rebuilt: Buffer[] = []
+  const droppedSeqs: number[] = []
   let changed = false
   for (const frame of frames) {
     const frameBytes = buffer.subarray(frame.start, frame.end)
     const plaintext = zstdDecompressSync(frameBytes).toString('utf8')
-    const { lines, changed: frameChanged } = patchPlaintextLines(plaintext)
-    if (frameChanged) {
+    const lines = stripLegacyRows(plaintext, droppedSeqs)
+    if (lines !== plaintext) {
       changed = true
       rebuilt.push(zstdCompressSync(Buffer.from(lines, 'utf8'), CHECKSUM_OPTIONS))
     } else {
@@ -169,38 +190,111 @@ async function repairZstdFile(path: string): Promise<FileOutcome> {
 }
 
 /**
- * Patch every `ya-subagent/started` line missing `ignorable` by inserting
- * `"ignorable":true` into the JSON object. Returns the new text and whether
- * any line changed. Lines that fail to parse as JSON are left untouched
- * (a corrupt line is the harness's refusal job, not ours).
+ * Strip every `ya-subagent/started` row from JSONL text and renumber the
+ * surviving rows so the read path's contiguity check still passes. The
+ * dropped-seq accumulator is shared across calls (zstd frames of one file are
+ * transformed sequentially) so later frames renumber against earlier drops.
+ * Returns the new text, or the input reference when nothing changed.
  */
-function patchPlaintextLines(text: string): { lines: string; changed: boolean } {
-  const lines = text.split('\n')
+function stripLegacyRows(text: string, droppedSeqs: number[]): string {
+  const source = text.split('\n')
+  const kept: string[] = []
   let changed = false
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    if (!line) continue
-    if (!line.includes(TARGET_TYPE)) continue
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(line)
-    } catch {
+  for (const line of source) {
+    if (line === '') {
+      // Preserve the trailing newline (the final empty segment) verbatim.
+      kept.push(line)
       continue
     }
-    if (typeof parsed !== 'object' || parsed === null) continue
-    const record = parsed as Record<string, unknown>
-    if (record['type'] !== TARGET_TYPE) continue
-    if (record['ignorable'] === true) continue
-    // Insert `ignorable` before the closing brace, preserving key order as
-    // closely as possible. JSON.stringify would re-sort/re-format the whole
-    // record; a surgical string edit keeps the rest of the line byte-stable.
-    const trimmed = line.trimEnd()
-    if (trimmed.endsWith('}')) {
-      lines[i] = trimmed.slice(0, -1) + ',"ignorable":true}'
+    const rewritten = rewriteLine(line, droppedSeqs)
+    if (rewritten === undefined) {
+      // Target row: dropped (its seq is already recorded in droppedSeqs).
       changed = true
+      continue
+    }
+    if (rewritten !== line) changed = true
+    kept.push(rewritten)
+  }
+  return changed ? kept.join('\n') : text
+}
+
+/**
+ * Rewrite one JSONL line under the current dropped-seq prefix.
+ * @returns the (possibly original) line text, or `undefined` when the line is
+ * a dropped target row.
+ */
+function rewriteLine(line: string, droppedSeqs: number[]): string | undefined {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(line)
+  } catch {
+    return line
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return line
+  const record = parsed as Record<string, unknown>
+
+  if (record['type'] === TARGET_TYPE && typeof record['seq'] === 'number') {
+    droppedSeqs.push(record['seq'])
+    return undefined
+  }
+
+  // Count dropped rows strictly before a seq: lines (and citations) are
+  // visited in ascending seq order, but a citation may point before or after
+  // individual dropped rows, so each value is shifted independently.
+  const shiftOf = (seq: number): number => {
+    let shift = 0
+    for (const dropped of droppedSeqs) {
+      if (dropped < seq) shift += 1
+    }
+    return shift
+  }
+
+  let modified = false
+
+  if (CHUNK_ROW_TYPES.has(String(record['type'])) && typeof record['seq0'] === 'number') {
+    const seq0 = record['seq0']
+    const shifted = seq0 - shiftOf(seq0)
+    if (shifted !== seq0) {
+      record['seq0'] = shifted
+      modified = true
+    }
+  } else if (typeof record['seq'] === 'number') {
+    const seq = record['seq']
+    const shifted = seq - shiftOf(seq)
+    if (shifted !== seq) {
+      record['seq'] = shifted
+      modified = true
     }
   }
-  return { lines: lines.join('\n'), changed }
+
+  if (Array.isArray(record['sourceEventSeqs'])) {
+    const shiftedEntries: unknown[] = []
+    let provenanceModified = false
+    for (const entry of record['sourceEventSeqs']) {
+      if (typeof entry === 'number') {
+        const shifted = entry - shiftOf(entry)
+        if (shifted !== entry) provenanceModified = true
+        shiftedEntries.push(shifted)
+      } else if (Array.isArray(entry) && entry.length === 2
+        && typeof entry[0] === 'number' && typeof entry[1] === 'number') {
+        const start = entry[0] - shiftOf(entry[0])
+        const end = entry[1] - shiftOf(entry[1])
+        if (start !== entry[0] || end !== entry[1]) provenanceModified = true
+        shiftedEntries.push([start, end])
+      } else {
+        // Malformed provenance: leave the whole array untouched.
+        shiftedEntries.length = 0
+        provenanceModified = false
+        break
+      }
+    }
+    if (provenanceModified) {
+      record['sourceEventSeqs'] = shiftedEntries
+      modified = true
+    }
+  }
+
+  return modified ? JSON.stringify(record) : line
 }
 
 /** Byte range of one complete Zstandard frame. */

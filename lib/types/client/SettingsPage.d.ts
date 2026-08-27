@@ -35,15 +35,33 @@ export interface YaSubagentSettingsInjected {
     readonly rpc: ClientConnectionRpc;
     /** Refetch the profile list from the host. */
     readonly fetchProfiles: () => Promise<readonly SubagentProfile[]>;
+    /** Refetch the routable model catalog (provider groups); undefined on failure. */
+    readonly fetchModelCatalog: () => Promise<ModelCatalogData | undefined>;
     /** Bound locale translator for the ya-subagent namespace. */
     readonly t: (key: string) => string;
 }
 /** Full props: settings.section runtime share + locale seat + inject. */
 type SettingsPageProps = PropsRuntime<'settings.section'> & PropsLocale<'ya-subagent'> & YaSubagentSettingsInjected;
+/** One model inside a provider group (mirrors `ModelCatalogModel`). */
+interface ModelEntry {
+    readonly id: string;
+    readonly name: string;
+    readonly description?: string;
+}
+/** One provider group (mirrors `ModelProviderGroup`). */
+interface ModelGroup {
+    readonly id: string;
+    readonly name: string;
+    readonly models: readonly ModelEntry[];
+}
+/** Model catalog wire shape (mirror of the host `ModelCatalog` read face). */
+interface ModelCatalogData {
+    readonly groups: readonly ModelGroup[];
+}
 /**
  * Render the subagent profiles settings page.
  * @param props - settings.section runtime share + locale + inject.
  * @returns the page element.
  */
-export declare function SettingsPage({ rpc, fetchProfiles, t }: SettingsPageProps): import("react").JSX.Element;
+export declare function SettingsPage({ rpc, fetchProfiles, fetchModelCatalog, t }: SettingsPageProps): import("react").JSX.Element;
 export {};

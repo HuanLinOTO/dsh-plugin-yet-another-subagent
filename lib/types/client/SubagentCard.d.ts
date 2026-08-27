@@ -20,10 +20,11 @@ export interface SubagentCardSessions {
     binding(id: string): {
         session: {
             projections: {
+                /** Absence of a value is an `undefined` snapshot, never a missing face. */
                 faceOf(key: string): {
                     getSnapshot(): unknown;
                     subscribe(fn: () => void): () => void;
-                } | undefined;
+                };
             };
         };
     } | undefined;

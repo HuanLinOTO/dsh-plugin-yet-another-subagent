@@ -52,7 +52,9 @@ export type YaSubagentValue = ProfileListResponse | ToolListResponse | RepairSta
  * Register the ya-subagent RPC channel on the host's connection service.
  * `connection` is in the plugin's inject list, so `ctx.connection` is
  * directly available; the channel route rolls back on fiber disposal
- * (the inner `owner.effect` owns cleanup).
+ * (the inner `owner.effect` owns cleanup). Trust and browser authentication
+ * moved to the physical `/api` carrier in v0.1.2-alpha.1, so channels no
+ * longer carry an `authority` option.
  * @param ctx - host context.
  * @param store - profile store.
  */

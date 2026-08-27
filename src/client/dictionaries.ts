@@ -18,6 +18,7 @@ import type { YaSubagentKey } from './locales.ts'
 /** All override-language dictionaries for the `ya-subagent` namespace. */
 export const dicts: Record<string, Record<YaSubagentKey, string>> = {
   ja: {
+    'common.close': '閉じる',
     'nav': 'サブエージェント',
     'page.title': 'サブエージェント設定',
     'page.empty': '設定されたプロファイルがありません。下に追加してください。',
@@ -97,6 +98,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': '修復に失敗しました',
   },
   de: {
+    'common.close': 'Schließen',
     'nav': 'Subagenten',
     'page.title': 'Subagenten-Profile',
     'page.empty': 'Keine Profile konfiguriert. Fügen Sie unten eines hinzu.',
@@ -176,6 +178,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': 'Reparatur fehlgeschlagen',
   },
   fr: {
+    'common.close': 'Fermer',
     'nav': 'Sous-agents',
     'page.title': 'Profils de sous-agents',
     'page.empty': 'Aucun profil configuré. Ajoutez-en un ci-dessous.',
@@ -255,6 +258,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': 'Échec de la réparation',
   },
   pt: {
+    'common.close': 'Fechar',
     'nav': 'Subagentes',
     'page.title': 'Perfis de subagentes',
     'page.empty': 'Nenhum perfil configurado. Adicione um abaixo.',
@@ -334,6 +338,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': 'Falha no reparo',
   },
   ko: {
+    'common.close': '닫기',
     'nav': '하위 에이전트',
     'page.title': '하위 에이전트 프로필',
     'page.empty': '구성된 프로필이 없습니다. 아래에서 추가하세요.',
@@ -413,6 +418,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': '복구 실패',
   },
   ar: {
+    'common.close': 'إغلاق',
     'nav': 'الوكلاء الفرعيون',
     'page.title': 'ملفات الوكلاء الفرعيين',
     'page.empty': 'لم يتم تكوين أي ملف شخصي. أضف واحدًا أدناه.',
@@ -492,6 +498,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': 'فشل الإصلاح',
   },
   hi: {
+    'common.close': 'बंद करें',
     'nav': 'उप-एजेंट',
     'page.title': 'उप-एजेंट प्रोफ़ाइल',
     'page.empty': 'कोई प्रोफ़ाइल कॉन्फ़िगर नहीं है। नीचे एक जोड़ें।',
@@ -571,6 +578,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': 'मरम्मत विफल',
   },
   id: {
+    'common.close': 'Tutup',
     'nav': 'Sub-agen',
     'page.title': 'Profil Sub-agen',
     'page.empty': 'Belum ada profil yang dikonfigurasi. Tambahkan satu di bawah.',
@@ -650,6 +658,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': 'Perbaikan gagal',
   },
   tr: {
+    'common.close': 'Kapat',
     'nav': 'Alt Aracılar',
     'page.title': 'Alt Aracı Profilleri',
     'page.empty': 'Yapılandırılmış profil yok. Aşağıya bir tane ekleyin.',
@@ -729,6 +738,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': 'Onarım başarısız',
   },
   vi: {
+    'common.close': 'Đóng',
     'nav': 'Đại lý con',
     'page.title': 'Hồ sơ đại lý con',
     'page.empty': 'Chưa có hồ sơ nào được cấu hình. Hãy thêm một hồ sơ bên dưới.',
@@ -808,6 +818,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': 'Sửa thất bại',
   },
   th: {
+    'common.close': 'ปิด',
     'nav': 'ตัวแทนย่อย',
     'page.title': 'โปรไฟล์ตัวแทนย่อย',
     'page.empty': 'ยังไม่มีการกำหนดโปรไฟล์ เพิ่มโปรไฟล์ด้านล่าง',
@@ -887,6 +898,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': 'ซ่อมแซมล้มเหลว',
   },
   ru: {
+    'common.close': 'Закрыть',
     'nav': 'Суб-агенты',
     'page.title': 'Профили суб-агентов',
     'page.empty': 'Нет настроенных профилей. Добавьте один ниже.',
@@ -966,6 +978,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': 'Сбой восстановления',
   },
   it: {
+    'common.close': 'Chiudi',
     'nav': 'Sotto-agenti',
     'page.title': 'Profili sotto-agente',
     'page.empty': 'Nessun profilo configurato. Aggiungine uno qui sotto.',
@@ -1045,6 +1058,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': 'Riparazione non riuscita',
   },
   nl: {
+    'common.close': 'Sluiten',
     'nav': 'Sub-agenten',
     'page.title': 'Sub-agentprofielen',
     'page.empty': 'Geen profielen geconfigureerd. Voeg er hieronder een toe.',
@@ -1124,6 +1138,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': 'Reparatie mislukt',
   },
   sv: {
+    'common.close': 'Stäng',
     'nav': 'Subagenter',
     'page.title': 'Subagentprofiler',
     'page.empty': 'Inga profiler konfigurerade. Lägg till en nedan.',
@@ -1203,6 +1218,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': 'Repareringen misslyckades',
   },
   pl: {
+    'common.close': 'Zamknij',
     'nav': 'Pod-agenci',
     'page.title': 'Profile pod-agentów',
     'page.empty': 'Brak skonfigurowanych profili. Dodaj jeden poniżej.',
@@ -1282,6 +1298,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': 'Nie udało się naprawić',
   },
   'zh-HK': {
+    'common.close': '關閉',
     'nav': '子代理',
     'page.title': '子代理設定',
     'page.empty': '暫無設定，請在下方新增。',
@@ -1361,6 +1378,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': '修復失敗',
   },
   'zh-TW': {
+    'common.close': '關閉',
     'nav': '子代理',
     'page.title': '子代理設定',
     'page.empty': '目前沒有設定，請在下方新增。',
@@ -1440,6 +1458,7 @@ export const dicts: Record<string, Record<YaSubagentKey, string>> = {
     'repair.error': '修復失敗',
   },
   'zh-MO': {
+    'common.close': '關閉',
     'nav': '子代理',
     'page.title': '子代理設定',
     'page.empty': '暫無設定，請在下方新增。',

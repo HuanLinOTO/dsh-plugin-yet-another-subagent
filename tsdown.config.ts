@@ -29,8 +29,8 @@ const CLIENT_EXTERNALS = [
   'react-dom',
   'react/jsx-runtime',
   '@deepseek-ai/cordis',
-  '@deepseek-ai/dsh-client-runtime',
-  '@deepseek-ai/dsh-client-runtime/client',
+  '@deepseek-ai/dsh-api-session-controller',
+  '@deepseek-ai/dsh-api-session-controller/client',
   '@deepseek-ai/dsh-client-locale',
   '@deepseek-ai/dsh-client-locale/client',
   '@deepseek-ai/dsh-client-connection',
@@ -45,7 +45,6 @@ const CLIENT_EXTERNALS = [
   '@deepseek-ai/dsh-client-ui-conversation/client',
   '@deepseek-ai/dsh-client-ui-input-trigger',
   '@deepseek-ai/dsh-client-ui-input-trigger/client',
-  '@deepseek-ai/dsh-client-web-react',
 ]
 
 /** Virtual-id wrapper keeping module CSS away from rolldown's CSS pipeline. */
@@ -137,14 +136,10 @@ const NODE_EXTERNALS = [
   '@deepseek-ai/dsh-llm',
   '@deepseek-ai/dsh-settings',
   '@deepseek-ai/dsh-invariants',
-  '@deepseek-ai/dsh-host-apiproxy',
-  '@deepseek-ai/dsh-host-apiproxy/api',
   '@deepseek-ai/dsh-client-connection',
   '@deepseek-ai/dsh-client-connection/client',
   '@deepseek-ai/dsh-client-locale',
   '@deepseek-ai/dsh-client-locale/client',
-  '@deepseek-ai/dsh-client-runtime',
-  '@deepseek-ai/dsh-client-runtime/client',
   '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-client-ui-tool',
   '@deepseek-ai/dsh-client-ui-tool/client',

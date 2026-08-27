@@ -25,7 +25,8 @@ export interface SubagentCardSessions {
   binding(id: string): {
     session: {
       projections: {
-        faceOf(key: string): { getSnapshot(): unknown; subscribe(fn: () => void): () => void } | undefined
+        /** Absence of a value is an `undefined` snapshot, never a missing face. */
+        faceOf(key: string): { getSnapshot(): unknown; subscribe(fn: () => void): () => void }
       }
     }
   } | undefined
@@ -129,7 +130,6 @@ function useChildProgress(
     const binding = sessions.binding(childId)
     if (binding === undefined) return
     const face = binding.session.projections.faceOf('yaSubagentProgress')
-    if (face === undefined) return
     const snapshot = face.getSnapshot() as YaSubagentProgressProjection | undefined
     setProgress(snapshot ?? undefined)
     return face.subscribe(() => {
@@ -155,7 +155,6 @@ function useChildIdFromProjection(
     const binding = sessions.binding(sessionId)
     if (binding === undefined) return
     const face = binding.session.projections.faceOf('subagentProfile')
-    if (face === undefined) return
     const read = (): string | undefined => {
       const snap = face.getSnapshot() as SubagentProfileProjection | undefined
       return snap?.calls?.[callId]

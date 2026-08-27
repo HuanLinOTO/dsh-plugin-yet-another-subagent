@@ -13,10 +13,14 @@
  * @module @huanlin/dsh-plugin-yet-another-subagent/client
  */
 
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ConnectionHandle, RpcResult } from '@deepseek-ai/dsh-client-connection/client'
 // Type-only: pulls the client connection Context merge (ctx.connection).
 import type {} from '@deepseek-ai/dsh-client-connection/client'
+// Type-only: pulls the sessions object layer's Context merge (ctx.sessions).
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+// Type-only: pulls the renderer's Context merge (ctx.slots).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the shell's SlotMap merges (settings.section, tool.call.toolview).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-tool/client'
@@ -44,6 +48,13 @@ export const inject = ['slots', 'locale', 'sessions', 'connection']
 
 /** Profile list wire shape (mirror of host `ProfileListResponse`). */
 type ProfileListResult = RpcResult<ProfileListResponse>
+
+/** Model catalog wire shape (mirror of the host `ModelCatalog` read face). */
+interface ModelCatalogData {
+  readonly groups: readonly { readonly id: string; readonly name: string; readonly models: readonly { readonly id: string; readonly name: string }[] }[]
+}
+
+type ModelCatalogResult = RpcResult<ModelCatalogData>
 
 /**
  * Client plugin body: register settings page + single `subagent` toolview slot.
@@ -106,6 +117,16 @@ export function apply(ctx: ClientContext): void {
     })
   })
 
+  // ---- Model catalog fetch for SettingsPage -----------------------------
+  // The generated session Remote serves `session/modelCatalog` on the shared
+  // `/api` channel (endpoint = namespace/method); the plugin reads it through
+  // the generic RPC caller instead of taking a dependency on the generated
+  // Remote assembly.
+  const fetchModelCatalogInternal = async (): Promise<ModelCatalogData | undefined> => {
+    const result = await connection.rpc.call('/api', 'session/modelCatalog', {}) as ModelCatalogResult
+    return result.ok ? result.value : undefined
+  }
+
   // ---- Single toolview slot (key: 'subagent') ---------------------------
   // The tool name is always `subagent`; the profile is a call parameter.
   // SubagentCard reads profileLabel from the result content (continuable
@@ -128,6 +149,7 @@ export function apply(ctx: ClientContext): void {
   const settingsInjected = (): YaSubagentSettingsInjected => ({
     rpc: connection.rpc,
     fetchProfiles,
+    fetchModelCatalog: fetchModelCatalogInternal,
     t,
   })
   ctx.slots.inject('settings.section', () => ctx.slots.register({

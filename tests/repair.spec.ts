@@ -13,14 +13,33 @@ function compressFrame(input: string | Buffer): Buffer {
 /** A header line the harness accepts (minimal valid shape). */
 const HEADER_LINE = '{"type":"session","version":0,"id":"s1","createdAt":1,"delegationDepth":0}'
 
-/** Build a `ya-subagent/started` line with optional ignorable. */
-function startedLine(seq: number, ignorable = false): string {
-  const base = `{"type":"ya-subagent/started","seq":${seq},"time":1,"data":{"callId":"c1","childId":"child-${seq}","profileId":"general"}}`
-  return ignorable ? base.replace(/}$/, ',"ignorable":true}') : base
+/** Build a legacy `ya-subagent/started` line at `seq`. */
+function startedLine(seq: number): string {
+  return `{"type":"ya-subagent/started","seq":${seq},"time":1,"data":{"callId":"c1","childId":"child-${seq}","profileId":"general"}}`
 }
 
 /** A neutral event line (type the harness knows). */
 const TURN_START_LINE = '{"type":"turn/start","seq":0,"time":1,"data":{"turn":0}}'
+
+/** Event line with an explicit seq, for renumbering assertions. */
+function turnStartLine(seq: number): string {
+  return `{"type":"turn/start","seq":${seq},"time":1,"data":{"turn":0}}`
+}
+
+/** Assistant chunk line (a provenance-citable event). */
+function chunkLine(seq: number, text: string): string {
+  return `{"type":"assistant/chunk","seq":${seq},"time":1,"data":{"turn":0,"step":0,"chunk":{"type":"text-delta","index":0,"text":"${text}"}}}`
+}
+
+/** Assistant message line citing earlier seqs (plain list + encoded range). */
+function messageLine(seq: number, provenance: string): string {
+  return `{"type":"assistant/message","seq":${seq},"time":2,"sourceEventSeqs":[${provenance}],"data":{"turn":0,"step":0,"message":{"id":"m","role":"assistant","content":[]},"usage":{"inputTokens":1,"outputTokens":1}}}`
+}
+
+/** Packed chunk-run storage row covering seq0..seq0+1. */
+function packedLine(seq0: number): string {
+  return `{"type":"text-chunks","seq0":${seq0},"time0":10,"data":{"turn":0,"step":0,"index":0,"dt":[5],"texts":["a","b"]}}`
+}
 
 /** Create a temp sessions root. */
 async function makeRoot(): Promise<string> {
@@ -28,11 +47,11 @@ async function makeRoot(): Promise<string> {
 }
 
 describe('repairSessions — plaintext (.jsonl)', () => {
-  it('patches a ya-subagent/started line missing ignorable', async () => {
+  it('removes a ya-subagent/started row and renumbers later rows', async () => {
     const root = await makeRoot()
     const file = join(root, 'project--', 'session-1', 'session.jsonl')
     await mkdir(join(root, 'project--', 'session-1'), { recursive: true })
-    const content = `${HEADER_LINE}\n${TURN_START_LINE}\n${startedLine(1)}\n`
+    const content = `${HEADER_LINE}\n${TURN_START_LINE}\n${startedLine(1)}\n${turnStartLine(2)}\n`
     await writeFile(file, content, 'utf8')
 
     const stats = await repairSessions(root)
@@ -42,23 +61,46 @@ describe('repairSessions — plaintext (.jsonl)', () => {
     expect(stats.errors).toEqual([])
 
     const after = await readFile(file, 'utf8')
-    expect(after).toContain('"ignorable":true')
-    expect(after).toContain(TURN_START_LINE)
+    expect(after).not.toContain('ya-subagent/started')
+    expect(after).toBe(`${HEADER_LINE}\n${TURN_START_LINE}\n${turnStartLine(1)}\n`)
   })
 
-  it('leaves an already-ignorable line untouched (idempotent)', async () => {
+  it('shifts sourceEventSeqs citations (plain entries and encoded ranges)', async () => {
     const root = await makeRoot()
     const file = join(root, 's.jsonl')
-    const content = `${HEADER_LINE}\n${startedLine(1, true)}\n`
+    // Dropped row at seq 2: citations 1 stays, 3→2, range [4,5]→[3,4], row 6→5.
+    const content = [
+      HEADER_LINE,
+      chunkLine(1, 'one'),
+      startedLine(2),
+      chunkLine(3, 'three'),
+      chunkLine(4, 'four'),
+      chunkLine(5, 'five'),
+      messageLine(6, '1,3,[4,5]'),
+    ].join('\n') + '\n'
     await writeFile(file, content, 'utf8')
 
     const stats = await repairSessions(root)
-    expect(stats.scanned).toBe(1)
-    expect(stats.repaired).toBe(0)
-    expect(stats.skipped).toBe(1)
+    expect(stats.repaired).toBe(1)
 
     const after = await readFile(file, 'utf8')
-    expect(after).toBe(content)
+    expect(after).not.toContain('ya-subagent/started')
+    expect(after).toContain(messageLine(5, '1,2,[3,4]'))
+    // Rows before the dropped seq keep their original bytes.
+    expect(after).toContain(chunkLine(1, 'one'))
+  })
+
+  it('renumbers packed chunk-run rows via seq0', async () => {
+    const root = await makeRoot()
+    const file = join(root, 's.jsonl')
+    const content = `${HEADER_LINE}\n${startedLine(2)}\n${packedLine(3)}\n`
+    await writeFile(file, content, 'utf8')
+
+    const stats = await repairSessions(root)
+    expect(stats.repaired).toBe(1)
+
+    const after = await readFile(file, 'utf8')
+    expect(after).toBe(`${HEADER_LINE}\n${packedLine(2)}\n`)
   })
 
   it('is idempotent across runs: second run skips a file the first repaired', async () => {
@@ -103,44 +145,41 @@ describe('repairSessions — plaintext (.jsonl)', () => {
     expect(after).toBe(`${HEADER_LINE}\n${TURN_START_LINE}\n`)
   })
 
-  it('preserves surrounding line content byte-for-byte except for the patch', async () => {
+  it('leaves unparsable lines untouched', async () => {
     const root = await makeRoot()
     const file = join(root, 's.jsonl')
-    const before = `${HEADER_LINE}\n${TURN_START_LINE}\n${startedLine(5)}\n${TURN_START_LINE}\n`
-    await writeFile(file, before, 'utf8')
+    const content = `${HEADER_LINE}\nnot-json-at-all\n${startedLine(1)}\n`
+    await writeFile(file, content, 'utf8')
 
-    await repairSessions(root)
+    const stats = await repairSessions(root)
+    expect(stats.repaired).toBe(1)
     const after = await readFile(file, 'utf8')
-    // Only the started line should differ; header + turn/start lines unchanged.
-    expect(after).toContain(HEADER_LINE)
-    expect(after).toContain(TURN_START_LINE)
-    // The patched line retains its original data fields.
-    expect(after).toContain('"callId":"c1"')
-    expect(after).toContain('"childId":"child-5"')
-    expect(after).toContain('"profileId":"general"')
-    expect(after).toContain('"ignorable":true')
+    expect(after).toContain('not-json-at-all')
+    expect(after).not.toContain('ya-subagent/started')
   })
 })
 
 describe('repairSessions — zstd (.jsonl.zstd)', () => {
-  it('patches an event-frame containing a target line', async () => {
+  it('removes a target row from an event frame and renumbers later frames', async () => {
     const root = await makeRoot()
     const file = join(root, 's.jsonl.zstd')
     const headerFrame = compressFrame(`${HEADER_LINE}\n`)
     const eventFrame = compressFrame(`${TURN_START_LINE}\n${startedLine(1)}\n`)
-    await writeFile(file, Buffer.concat([headerFrame, eventFrame]))
+    const laterFrame = compressFrame(`${turnStartLine(2)}\n`)
+    await writeFile(file, Buffer.concat([headerFrame, eventFrame, laterFrame]))
 
     const stats = await repairSessions(root)
     expect(stats.scanned).toBe(1)
     expect(stats.repaired).toBe(1)
 
     const after = await readFile(file)
-    // Decompress the whole file and check the patched line is present.
     const { zstdDecompressSync } = await import('node:zlib')
     const frames = splitFrames(after)
     const plaintext = frames.map(f => zstdDecompressSync(f).toString('utf8')).join('')
-    expect(plaintext).toContain('"ignorable":true')
+    expect(plaintext).not.toContain('ya-subagent/started')
     expect(plaintext).toContain(HEADER_LINE)
+    expect(plaintext).toContain(TURN_START_LINE)
+    expect(plaintext).toContain(turnStartLine(1))
   })
 
   it('copies untouched frames verbatim (header frame bytes identical)', async () => {
@@ -214,8 +253,7 @@ describe('repairSessions — directory traversal', () => {
 
   it('records per-file errors without throwing', async () => {
     const root = await makeRoot()
-    // A .jsonl file that is a directory (stat says isFile=false → skipped, no error).
-    // Instead, test a missing root: should produce one top-level error.
+    // A missing root: should produce one top-level error.
     const stats = await repairSessions(join(root, 'does-not-exist'))
     expect(stats.scanned).toBe(0)
     expect(stats.errors.length).toBeGreaterThanOrEqual(1)

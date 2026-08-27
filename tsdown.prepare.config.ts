@@ -38,8 +38,6 @@ export default defineConfig([
       'react',
       'react-dom',
       '@deepseek-ai/cordis',
-      '@deepseek-ai/dsh-client-runtime',
-      '@deepseek-ai/dsh-client-runtime/client',
       '@deepseek-ai/dsh-client-locale',
       '@deepseek-ai/dsh-client-locale/client',
       '@deepseek-ai/dsh-client-connection',

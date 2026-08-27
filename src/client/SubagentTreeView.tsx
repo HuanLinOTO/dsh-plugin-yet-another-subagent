@@ -32,7 +32,8 @@ interface TreeSessions {
   binding(id: string): {
     session: {
       projections: {
-        faceOf(key: string): { getSnapshot(): unknown; subscribe(fn: () => void): () => void } | undefined
+        /** Absence of a value is an `undefined` snapshot, never a missing face. */
+        faceOf(key: string): { getSnapshot(): unknown; subscribe(fn: () => void): () => void }
       }
     }
   } | undefined
@@ -68,7 +69,6 @@ function useChildren(sessions: TreeSessions, sessionId: string): Record<string, 
     const binding = sessions.binding(sessionId)
     if (binding === undefined) return
     const face = binding.session.projections.faceOf('subagentProfile')
-    if (face === undefined) return
     const read = (): void => {
       const snap = face.getSnapshot() as SubagentProfileProjection | undefined
       setChildren(snap?.children ?? {})
@@ -89,7 +89,6 @@ function useChildProgress(
     const binding = sessions.binding(childId)
     if (binding === undefined) return
     const face = binding.session.projections.faceOf('yaSubagentProgress')
-    if (face === undefined) return
     const snapshot = face.getSnapshot() as YaSubagentProgressProjection | undefined
     setProgress(snapshot ?? undefined)
     return face.subscribe(() => {
@@ -157,16 +156,13 @@ function buildTree(
 
     // Recursively build children from this child's catalog.
     const childProjectionChildren: Record<string, string> = {}
-    // Try to read the child's projection children if binding exists.
+    // Read the child's projection children when a binding exists.
     const binding = sessions.binding(entry.id)
     if (binding !== undefined) {
-      const face = binding.session.projections.faceOf('subagentProfile')
-      if (face !== undefined) {
-        const snap = face.getSnapshot() as SubagentProfileProjection | undefined
-        if (snap?.children !== undefined) {
-          for (const [k, v] of Object.entries(snap.children)) {
-            childProjectionChildren[k] = v
-          }
+      const snap = binding.session.projections.faceOf('subagentProfile').getSnapshot() as SubagentProfileProjection | undefined
+      if (snap?.children !== undefined) {
+        for (const [k, v] of Object.entries(snap.children)) {
+          childProjectionChildren[k] = v
         }
       }
     }

@@ -6,6 +6,7 @@
 
 /** All copy keys for the ya-subagent namespace. */
 export type YaSubagentKey =
+  | 'common.close'
   | 'nav'
   | 'page.title'
   | 'page.empty'
@@ -89,6 +90,7 @@ export const NS = 'ya-subagent'
 
 /** English dictionary. */
 export const en: Record<YaSubagentKey, string> = {
+  'common.close': 'Close',
   'nav': 'Subagents',
   'page.title': 'Subagent Profiles',
   'page.empty': 'No profiles configured. Add one below.',
@@ -153,7 +155,7 @@ export const en: Record<YaSubagentKey, string> = {
   'tree.state.settled': 'settled',
   'repair.button': 'Repair session history',
   'repair.confirm.title': 'Repair session history?',
-  'repair.confirm.body': 'Scans every session log under $DSH_HOME/sessions and stamps "ignorable" on legacy ya-subagent/started events so the harness can load them again. Each modified file is backed up to .bak first.',
+  'repair.confirm.body': 'Scans every session log under $DSH_HOME/sessions and removes legacy ya-subagent/started events (renumbering later entries) so the harness can load the logs again. Each modified file is backed up to .bak first.',
   'repair.confirm.warning': 'If dsh is running, a session being written right now may conflict; prefer running this when no agent is active.',
   'repair.confirm.cancel': 'Cancel',
   'repair.confirm.proceed': 'Repair',
@@ -170,6 +172,7 @@ export const en: Record<YaSubagentKey, string> = {
 
 /** Chinese dictionary. */
 export const zh: Record<YaSubagentKey, string> = {
+  'common.close': '关闭',
   'nav': '子代理',
   'page.title': '子代理配置',
   'page.empty': '暂无配置，请在下方添加。',
@@ -234,7 +237,7 @@ export const zh: Record<YaSubagentKey, string> = {
   'tree.state.settled': '已结束',
   'repair.button': '修复历史会话',
   'repair.confirm.title': '修复历史会话？',
-  'repair.confirm.body': '将扫描 $DSH_HOME/sessions 下的所有会话日志，为遗留的 ya-subagent/started 事件补上 "ignorable" 标记，使 harness 能重新加载。每个被修改的文件会先备份为 .bak。',
+  'repair.confirm.body': '将扫描 $DSH_HOME/sessions 下的所有会话日志，删除遗留的 ya-subagent/started 事件（并重排后续序号），使 harness 能重新加载日志。每个被修改的文件会先备份为 .bak。',
   'repair.confirm.warning': '若 dsh 正在运行，正在写入的会话可能冲突；建议在无活跃代理时执行。',
   'repair.confirm.cancel': '取消',
   'repair.confirm.proceed': '修复',

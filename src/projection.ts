@@ -34,20 +34,30 @@ export interface SubagentProfileProjection {
   readonly calls: Record<string, string>
 }
 
-/** Internal fold state for `subagentProfile`. */
+/**
+ * Internal fold state for `subagentProfile`. Plain JSON only (the persisted
+ * projection-cache precondition), so the pending callId map is a Record,
+ * not a Map.
+ */
 interface ProfileState {
   /** callId → profileId, awaiting the matching `tool/result`. */
-  readonly pending: Map<string, string>
+  readonly pending: Record<string, string>
   /** childId → profileId (the durable mapping). */
   readonly mapping: Record<string, string>
   /** callId → childId (survives after the pending entry is consumed). */
   readonly callToChild: Record<string, string>
 }
 
-const profileSchema = z.object({
+const profileStateSchema = z.object({
+  pending: z.record(z.string(), z.string()),
+  mapping: z.record(z.string(), z.string()),
+  callToChild: z.record(z.string(), z.string()),
+}).strict()
+
+const profileViewSchema = z.object({
   children: z.record(z.string(), z.string()),
   calls: z.record(z.string(), z.string()),
-}).strict() as unknown as z.ZodType<SubagentProfileProjection>
+}).strict()
 
 /**
  * Fold the parent session's `tool/call` + `tool/result` for tool name
@@ -56,51 +66,53 @@ const profileSchema = z.object({
  * or `runId` (foreground branch); the continuable branch is the durable
  * child identity that survives across activations.
  */
-export const subagentProfileProjection: ProjectionDefinition<'subagentProfile', ProfileState> = {
+export const subagentProfileProjection = {
   key: 'subagentProfile',
-  schema: profileSchema,
-  stateVersion: 3,
-  init: () => ({ pending: new Map(), mapping: {}, callToChild: {} }),
+  stateSchema: profileStateSchema,
+  stateVersion: 4,
+  init: () => ({ pending: {}, mapping: {}, callToChild: {} }),
   apply: (state, event) => {
     // `ya-subagent/started` was historically appended by the tool execute to
-    // surface childId early. Writing it was removed (harness persistence
-    // refuses unknown event types without an ignorable flag that
-    // `session.append` cannot set), but the fold stays so logs written by
-    // older plugin versions still resolve childId for the client card.
+    // surface childId early; writing it stopped in v0.1.3 and v0.1.2-alpha.1
+    // logs must have those rows stripped to load at all. The branch stays so
+    // the fold remains correct for any log shape that still carries one.
     if (event.type === 'ya-subagent/started') {
       const { callId, childId, profileId } = event.data
-      const nextMapping = { ...state.mapping, [childId]: profileId }
-      const nextCallToChild = { ...state.callToChild, [callId]: childId }
-      const nextPending = new Map(state.pending)
-      nextPending.delete(callId)
-      return { pending: nextPending, mapping: nextMapping, callToChild: nextCallToChild }
+      const nextPending = { ...state.pending }
+      delete nextPending[callId]
+      return {
+        pending: nextPending,
+        mapping: { ...state.mapping, [childId]: profileId },
+        callToChild: { ...state.callToChild, [callId]: childId },
+      }
     }
     if (event.type === 'tool/call' && event.data.name === 'subagent') {
       const profileId = readProfileId(event.data.arguments)
       if (profileId === undefined) return state
-      const nextPending = new Map(state.pending)
-      nextPending.set(event.data.callId, profileId)
-      return { ...state, pending: nextPending }
+      return { ...state, pending: { ...state.pending, [event.data.callId]: profileId } }
     }
     if (event.type === 'tool/result') {
-      // `tool/result` carries the callId on the message's first content block
-      // (a ToolResultBlock), not on the event data itself.
-      const callId = event.data.message.content[0]?.toolCallId
-      if (callId === undefined) return state
-      const profileId = state.pending.get(callId)
+      // The result message's `source.callId` pairs it with its `tool/call`.
+      const callId = event.data.message.source.callId
+      const profileId = state.pending[callId]
       if (profileId === undefined) return state
       const childId = readChildId(event.data.message)
-      const nextPending = new Map(state.pending)
-      nextPending.delete(callId)
+      const nextPending = { ...state.pending }
+      delete nextPending[callId]
       if (childId === undefined) return { ...state, pending: nextPending }
-      const nextMapping = { ...state.mapping, [childId]: profileId }
-      const nextCallToChild = { ...state.callToChild, [callId]: childId }
-      return { pending: nextPending, mapping: nextMapping, callToChild: nextCallToChild }
+      return {
+        pending: nextPending,
+        mapping: { ...state.mapping, [childId]: profileId },
+        callToChild: { ...state.callToChild, [callId]: childId },
+      }
     }
     return state
   },
-  view: state => ({ children: state.mapping, calls: state.callToChild }),
-}
+  wire: {
+    viewSchema: profileViewSchema,
+    view: state => ({ children: state.mapping, calls: state.callToChild }),
+  },
+} satisfies ProjectionDefinition<'subagentProfile', ProfileState>
 
 /** Parse the `profile` field from a `tool/call` arguments JSON string. */
 function readProfileId(argumentsRaw: string): string | undefined {
@@ -248,7 +260,7 @@ const activitySchema = z.union([
   z.object({ kind: z.literal('tool'), name: z.string(), args: z.string().optional() }).strict(),
 ])
 
-const progressSchema = z.object({
+const progressViewSchema = z.object({
   toolCallCount: z.number().int().nonnegative(),
   tokens: z.object({
     input: z.number().int().nonnegative(),
@@ -259,17 +271,22 @@ const progressSchema = z.object({
   }).strict(),
   state: z.union([z.literal('running'), z.literal('idle'), z.literal('settled')]),
   activity: activitySchema.optional(),
-}).strict() as unknown as z.ZodType<YaSubagentProgressProjection>
+}).strict()
+
+/** The fold state is the wire view plus the in-flight streaming accumulator. */
+const progressStateSchema = progressViewSchema.extend({
+  streamingText: z.string(),
+})
 
 /**
  * Fold the child session's own events into a compact progress view. Token
  * usage accumulates from `assistant/message.usage` (cache fields are
  * optional); tool calls are counted; lifecycle follows turn boundaries.
  */
-export const yaSubagentProgressProjection: ProjectionDefinition<'yaSubagentProgress', ProgressState> = {
+export const yaSubagentProgressProjection = {
   key: 'yaSubagentProgress',
-  schema: progressSchema,
-  stateVersion: 2,
+  stateSchema: progressStateSchema,
+  stateVersion: 3,
   init: () => ({
     toolCallCount: 0,
     tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 },
@@ -344,22 +361,31 @@ export const yaSubagentProgressProjection: ProjectionDefinition<'yaSubagentProgr
     }
     return state
   },
-  view: state => {
-    const { streamingText: _, ...rest } = state
-    return rest
+  wire: {
+    viewSchema: progressViewSchema,
+    view: state => {
+      const { streamingText: _, ...rest } = state
+      return rest
+    },
   },
-}
+} satisfies ProjectionDefinition<'yaSubagentProgress', ProgressState>
 
 /** Convenience: the projection keys registered by this plugin. */
 export const PROJECTION_KEYS = ['subagentProfile', 'yaSubagentProgress'] as const
 
-/** Type-side declaration merge so consumers can read these keys via the projection registry. */
+/** Type-side declaration merges so consumers can read these keys via the projection registry. */
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionMap {
-    /** Parent-session map of childId → profileId. Empty object when no children yet. */
+    /** Parent-session map of childId → profileId. */
     subagentProfile: SubagentProfileProjection
     /** Child-session live progress (toolcall count + token usage + state). */
     yaSubagentProgress: YaSubagentProgressProjection
+  }
+  interface SessionProjectionStateMap {
+    /** Host fold state behind {@link SubagentProfileProjection}. */
+    subagentProfile: ProfileState
+    /** Host fold state behind {@link YaSubagentProgressProjection}. */
+    yaSubagentProgress: ProgressState
   }
 }
 

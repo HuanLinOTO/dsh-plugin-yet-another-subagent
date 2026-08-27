@@ -23,7 +23,7 @@
 import type { Context } from 'cordis'
 // Value import triggers `declare module 'cordis'` merge for `ctx.connection`.
 import type {} from '@deepseek-ai/dsh-client-connection'
-import type { RpcResult } from '@deepseek-ai/dsh-host-apiproxy/api'
+import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import type { SubagentProfile } from './types.ts'
 import type { ProfileStore } from './profile-store.ts'
 import { repairSessions, type RepairStats } from './repair.ts'
@@ -57,12 +57,12 @@ export interface ProfileRemovePayload {
 export type YaSubagentValue = ProfileListResponse | ToolListResponse | RepairStats
 
 /** Build an RPC ok branch. */
-function ok(value: YaSubagentValue): RpcResult<YaSubagentValue> {
+function ok(value: YaSubagentValue): ConnectionRpcResult<YaSubagentValue> {
   return { ok: true, value }
 }
 
 /** Build an RPC error branch using the closed `internal` code (no plugin-specific code). */
-function fail(message: string): RpcResult<YaSubagentValue> {
+function fail(message: string): ConnectionRpcResult<YaSubagentValue> {
   return { ok: false, error: { code: 'internal', message, details: {} } }
 }
 
@@ -70,7 +70,9 @@ function fail(message: string): RpcResult<YaSubagentValue> {
  * Register the ya-subagent RPC channel on the host's connection service.
  * `connection` is in the plugin's inject list, so `ctx.connection` is
  * directly available; the channel route rolls back on fiber disposal
- * (the inner `owner.effect` owns cleanup).
+ * (the inner `owner.effect` owns cleanup). Trust and browser authentication
+ * moved to the physical `/api` carrier in v0.1.2-alpha.1, so channels no
+ * longer carry an `authority` option.
  * @param ctx - host context.
  * @param store - profile store.
  */
@@ -80,8 +82,7 @@ export function registerRpc(ctx: Context, store: ProfileStore): void {
       readonly rpc: {
         readonly handle: (
           channel: string,
-          handler: (endpoint: string, payload: unknown, signal: AbortSignal) => Promise<RpcResult<unknown>>,
-          options: { readonly authority: 'trusted-host' | 'loopback' },
+          handler: (endpoint: string, payload: unknown, signal: AbortSignal) => Promise<ConnectionRpcResult<unknown>>,
         ) => unknown
       }
     }
@@ -139,6 +140,5 @@ export function registerRpc(ctx: Context, store: ProfileStore): void {
             return fail(`unknown endpoint: ${endpoint}`)
         }
       },
-      { authority: 'trusted-host' },
     )
 }
