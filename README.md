@@ -17,7 +17,7 @@
   - 复用官方 `spawn` provider，支持前台（foreground）和后台（continuable / one-shot）两种模式
   - Profile 状态通过 settings seam 持久化到 `$DSH_HOME/settings.yaml`
   - RPC CRUD：`profiles.list` / `.add` / `.update` / `.remove`（专用 `/ya-subagent` 通道，不共享 `/api`）
-  - 两个 session projection：`subagentProfile`（父会话 childId→profileId 映射 + callId→childId）+ `yaSubagentProgress`（子会话实时 toolcall/token/活动状态）
+  - 两个 session projection：`subagentProfile`（父会话 childId→profileId 映射 + callId→childId）+ `yaSubagentProgress`（子会话实时 toolcall/token/活动状态）；wire view 已做引用记忆化，适配 dsh 0.1.2-alpha.3 起 change feed 的 `Object.is` 下发门控（内容不变即静默）
 - **Client 半**（`src/client/index.ts`）：
   - `settings.section` — Profile 编辑页
   - `tool.call.toolview`（key `subagent`）— `SubagentCard` 工具调用卡片

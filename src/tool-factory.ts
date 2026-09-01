@@ -22,7 +22,7 @@ import type { Context } from 'cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { AgentOptions } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { JsonValue } from '@deepseek-ai/dsh-session'
+import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 // Value import triggers `declare module 'cordis'` merge so `ctx.subagents`
 // is typed. settleRun is reused by the foreground path.
 import { settleRun } from '@deepseek-ai/dsh-subagent'

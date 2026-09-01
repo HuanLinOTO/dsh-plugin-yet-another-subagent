@@ -16,6 +16,7 @@ Bundle-style DSH plugin exposing configurable subagent profiles as model-facing 
 - **Two projections**:
   - `subagentProfile` (parent session): fold `tool/call.name` + `tool/result` content → `childId → profileId` map.
   - `yaSubagentProgress` (child session): fold `tool/call`, `assistant/message.usage`, `turn/start`, `turn/end` → live toolcall count + token totals + state.
+  - Both `wire.view`s are wrapped in `memoizeView` (dsh 0.1.2-alpha.3 contract): the projection drive publishes only on raw-view `Object.is` change, so an object-valued view must reuse its reference while the wire content is unchanged. The fold states stay untouched — only the view objects are memoized.
 - **ESM-only**: `"type": "module"`, relative imports use `.ts` extensions (allowImportingTsExtensions + rewriteRelativeImportExtensions).
 
 ## File responsibilities

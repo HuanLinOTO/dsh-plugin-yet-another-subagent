@@ -25,8 +25,9 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 // Value import triggers `declare module 'cordis'` merge for `ctx.subagents`.
 import { assertSubagentMaxDepth } from '@deepseek-ai/dsh-subagent'
 import type { SubagentProvider } from '@deepseek-ai/dsh-subagent'
-// Value import triggers `declare module 'cordis'` merge for `ctx.settings`.
-import { settingsNamespace } from '@deepseek-ai/dsh-settings'
+// Type-only import still loads the module's `declare module 'cordis'` merge
+// for `ctx.settings` (alpha.2 removed the `settingsNamespace` value export).
+import type {} from '@deepseek-ai/dsh-settings'
 import { ProfileStore } from './profile-store.ts'
 import { buildTool } from './tool-factory.ts'
 import { registerRpc } from './rpc.ts'
@@ -42,7 +43,7 @@ export const inject = ['tools', 'subagents', 'agents', 'sessionProjections', 'co
 export type { SubagentProfile, YaSubagentConfig } from './types.ts'
 
 /** Settings namespace under which profile state persists (`$DSH_HOME/settings.yaml`). */
-export const SETTINGS_NAMESPACE = settingsNamespace('ya-subagent')
+export const SETTINGS_NAMESPACE = 'ya-subagent'
 
 /** Schemastery schema for one profile (config layer). */
 const SubagentProfileSchema = z.object({

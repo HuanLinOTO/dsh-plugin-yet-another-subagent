@@ -36,6 +36,7 @@ const LINKS = {
   '@deepseek-ai/dsh-settings': join(BUILT, 'packages', 'settings', 'settings'),
   '@deepseek-ai/dsh-subagent': join(BUILT, 'packages', 'subagent', 'subagent'),
   '@deepseek-ai/dsh-tools': join(BUILT, 'packages', 'core', 'tools'),
+  '@deepseek-ai/dsh-util-values': join(BUILT, 'packages', 'util', 'values'),
 }
 
 if (!existsSync(BUILT)) {

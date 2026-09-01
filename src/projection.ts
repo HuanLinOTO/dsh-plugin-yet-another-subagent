@@ -15,12 +15,60 @@
  * Both units are pure synchronous folds; the framework drives them and the
  * host wire layer ships the validated views.
  *
+ * Alpha.3 change-feed contract (`@deepseek-ai/dsh-session-projection`): the
+ * drive publishes a client view only when its raw output changes by
+ * `Object.is`, so an object-valued view MUST reuse its reference while the
+ * wire content is unchanged — a fresh object per call republishes on every
+ * internal-only state change (e.g. the excluded `streamingText`
+ * accumulator). Both `view`s below go through {@link memoizeView} for that
+ * reference-stability guarantee.
+ *
  * @module @huanlin/dsh-plugin-yet-another-subagent/projection
  */
 
 import { z } from 'zod'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+
+// ---------------------------------------------------------------------------
+// View reference stability (alpha.3 `Object.is` change-feed gate)
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrap a pure view builder so equal content reuses the SAME object reference.
+ *
+ * The alpha.3 projection drive keeps the two latest raw `view` results per
+ * session cell and publishes only when they differ by `Object.is`. A view
+ * that allocates a fresh object per call defeats that gate; this wrapper
+ * returns the previous object whenever the newly built one is content-equal
+ * (`equal`) or the state reference is unchanged (repeated reads of the same
+ * cell). The memo is shared across sessions folded by the unit — returning a
+ * content-equal reference from another session's earlier state is still
+ * correct, since each session's gate only compares its own consecutive
+ * results and a stable reference satisfies it identically.
+ */
+function memoizeView<S, V>(build: (state: S) => V, equal: (a: V, b: V) => boolean): (state: S) => V {
+  let lastState: S | undefined
+  let lastView: V | undefined
+  return (state) => {
+    if (lastView !== undefined && Object.is(state, lastState)) return lastView
+    const candidate = build(state)
+    if (lastView !== undefined && equal(candidate, lastView)) return lastView
+    lastState = state
+    lastView = candidate
+    return candidate
+  }
+}
+
+/** Content equality for flat `Record<string, string>` views. */
+function recordEqual(a: Record<string, string>, b: Record<string, string>): boolean {
+  const keys = Object.keys(a)
+  if (keys.length !== Object.keys(b).length) return false
+  for (const key of keys) {
+    if (a[key] !== b[key]) return false
+  }
+  return true
+}
 
 // ---------------------------------------------------------------------------
 // subagentProfile (parent session): childId → profileId
@@ -110,7 +158,13 @@ export const subagentProfileProjection = {
   },
   wire: {
     viewSchema: profileViewSchema,
-    view: state => ({ children: state.mapping, calls: state.callToChild }),
+    // Memoized: a `tool/result` that only consumes a pending callId (no
+    // childId extracted) changes the fold state but not the wire content —
+    // the stable reference keeps the alpha.3 change feed quiet.
+    view: memoizeView(
+      state => ({ children: state.mapping, calls: state.callToChild }),
+      (a, b) => recordEqual(a.children, b.children) && recordEqual(a.calls, b.calls),
+    ),
   },
 } satisfies ProjectionDefinition<'subagentProfile', ProfileState>
 
@@ -278,6 +332,34 @@ const progressStateSchema = progressViewSchema.extend({
   streamingText: z.string(),
 })
 
+/** Content equality for the progress view's token totals. */
+function tokensEqual(
+  a: YaSubagentProgressProjection['tokens'],
+  b: YaSubagentProgressProjection['tokens'],
+): boolean {
+  return a.input === b.input
+    && a.output === b.output
+    && a.cacheRead === b.cacheRead
+    && a.cacheWrite === b.cacheWrite
+    && a.reasoning === b.reasoning
+}
+
+/** Content equality for the progress view's activity union. */
+function activityEqual(a: Activity | undefined, b: Activity | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b
+  if (a.kind === 'text' && b.kind === 'text') return a.text === b.text
+  if (a.kind === 'tool' && b.kind === 'tool') return a.name === b.name && a.args === b.args
+  return false
+}
+
+/** Content equality for the whole progress view (per-field, no identity). */
+function progressViewEqual(a: YaSubagentProgressProjection, b: YaSubagentProgressProjection): boolean {
+  return a.toolCallCount === b.toolCallCount
+    && a.state === b.state
+    && tokensEqual(a.tokens, b.tokens)
+    && activityEqual(a.activity, b.activity)
+}
+
 /**
  * Fold the child session's own events into a compact progress view. Token
  * usage accumulates from `assistant/message.usage` (cache fields are
@@ -363,10 +445,17 @@ export const yaSubagentProgressProjection = {
   },
   wire: {
     viewSchema: progressViewSchema,
-    view: state => {
-      const { streamingText: _, ...rest } = state
-      return rest
-    },
+    // Memoized: `streamingText` deltas and `step/start` resets mutate the
+    // fold state without touching the wire content once the truncated
+    // activity text has stabilized — the stable reference keeps the alpha.3
+    // change feed quiet while live deltas (pre-truncation) still publish.
+    view: memoizeView(
+      state => {
+        const { streamingText: _, ...rest } = state
+        return rest
+      },
+      progressViewEqual,
+    ),
   },
 } satisfies ProjectionDefinition<'yaSubagentProgress', ProgressState>
 

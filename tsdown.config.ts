@@ -135,6 +135,7 @@ const NODE_EXTERNALS = [
   '@deepseek-ai/dsh-jobs',
   '@deepseek-ai/dsh-llm',
   '@deepseek-ai/dsh-settings',
+  '@deepseek-ai/dsh-util-values',
   '@deepseek-ai/dsh-invariants',
   '@deepseek-ai/dsh-client-connection',
   '@deepseek-ai/dsh-client-connection/client',

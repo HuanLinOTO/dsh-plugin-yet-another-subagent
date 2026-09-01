@@ -23,7 +23,7 @@ export declare const name = "yet-another-subagent";
 export declare const inject: string[];
 export type { SubagentProfile, YaSubagentConfig } from './types.ts';
 /** Settings namespace under which profile state persists (`$DSH_HOME/settings.yaml`). */
-export declare const SETTINGS_NAMESPACE: import("@deepseek-ai/dsh-settings").SettingsNamespace;
+export declare const SETTINGS_NAMESPACE = "ya-subagent";
 export interface Config extends YaSubagentConfig {
 }
 export declare const Config: z<Config>;

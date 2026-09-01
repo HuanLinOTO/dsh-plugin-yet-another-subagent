@@ -15,6 +15,14 @@
  * Both units are pure synchronous folds; the framework drives them and the
  * host wire layer ships the validated views.
  *
+ * Alpha.3 change-feed contract (`@deepseek-ai/dsh-session-projection`): the
+ * drive publishes a client view only when its raw output changes by
+ * `Object.is`, so an object-valued view MUST reuse its reference while the
+ * wire content is unchanged — a fresh object per call republishes on every
+ * internal-only state change (e.g. the excluded `streamingText`
+ * accumulator). Both `view`s below go through {@link memoizeView} for that
+ * reference-stability guarantee.
+ *
  * @module @huanlin/dsh-plugin-yet-another-subagent/projection
  */
 import { z } from 'zod';
