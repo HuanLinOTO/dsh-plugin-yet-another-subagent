@@ -8,7 +8,7 @@ Bundle-style DSH plugin exposing configurable subagent profiles as model-facing 
 
 - **Bundle form**: `cordis.patch.yml` disables two official rows + inserts one plugin row; `package.json` has `dsh.bundle.patch`. No source patches to DSH staging.
 - **Peer deps**: cordis + schemastery + `@deepseek-ai/dsh-*` (provided by host). `zod` is the only runtime npm dep.
-- **Single bundle, dual entry**: `.` (host), `./client` (browser), `./invariant` (companion).
+- **Single bundle, dual entry**: `.` (host), `./client` (browser). No `./invariant` entry: since dsh 0.1.2-rc.1 the invariant rule forbids empty installers, and this plugin's registrations (tools/RPC/projections) have no independent divergent runtime observation — the export, `src/invariant.ts`, and the `dsh-invariants` peer dep were removed in the rc.1 migration.
 - **Persistence via settings seam**: profile state lives under the `ya-subagent` namespace in `$DSH_HOME/settings.yaml`. `ctx.inject(['settings'], …)` registers the namespace with cordis.yml config as composition `base`; `ProfileStore.attachScope(scope)` wires CRUD mutations to `scope.replace()`. External yaml edits hot-reload through `scope.watch` → `reloadFromScope` → `syncTools`. Headless assemblies (no settings provider) fall back to in-memory state.
 - **Profile = tool instance**: each user-configured profile maps to a `subagent_<profile_id>` tool registered via `ctx.tools.register(defineTool(...))`. Reuses official `spawn` provider via `ctx.subagents.startContinuable`.
 - **ProfileLabel in result content**: tool execute embeds `profileLabel` in the continuable result content (`started <label> subagent <id>`), so SubagentCard reads it with zero RPC (SkillRow paradigm).
@@ -24,7 +24,6 @@ Bundle-style DSH plugin exposing configurable subagent profiles as model-facing 
 | File | Role |
 |------|------|
 | `src/index.ts` | Host entry: `name`, `inject = ['tools', 'subagents', 'sessionProjections']`, `Config` (Schemastery), `apply` (settings namespace registration + scope.watch) |
-| `src/invariant.ts` | `./invariant` companion (empty installer: registrations are HMR-proven) |
 | `src/types.ts` | `SubagentProfile`, `YaSubagentConfig`, `agentOptionsFor`, `isValidProfileId` |
 | `src/profile-store.ts` | `ProfileStore` class with CRUD (`add`/`update`/`remove`/`list`/`get`) + `attachScope`/`reloadFromScope` for settings persistence |
 | `src/tool-factory.ts` | `buildTool(profile, ctx)` → `defineTool` options (continuable default + foreground fallback). No longer appends `ya-subagent/started` events (the persistence read path refuses any event type outside the generated `KNOWN_SESSION_EVENT_TYPES`). |
@@ -44,7 +43,7 @@ Bundle-style DSH plugin exposing configurable subagent profiles as model-facing 
 ```sh
 pnpm run typecheck    # tsc --noEmit (resolves DSH src through ../dsh)
 pnpm test             # vitest run
-pnpm run build        # tsc + tsdown → lib/index.js, lib/invariant.js, lib/client.js
+pnpm run build        # tsc + tsdown → lib/index.js, lib/client.js
 ```
 
 ## Adding a new profile

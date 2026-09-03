@@ -10,7 +10,9 @@
 
 ## 架构
 
-单 bundle，三入口（host `.` + invariant `./invariant` + client `./client`）。
+单 bundle，双入口（host `.` + client `./client`）。
+
+> 不发布 `./invariant`：本插件的工具/RPC/projection 注册均无独立可分歧的运行时观察（HMR 安全性由测试证明），无内容可校验——按 DSH 0.1.2-rc.1 收紧后的 invariant 规则（禁止空 installer）省略该入口及其全部接线。
 
 - **Host 半**（`src/index.ts`）：
   - 单一 `subagent` 工具，通过 `profile` 枚举参数选择 profile（非每 profile 一个工具）
@@ -71,7 +73,7 @@
 pnpm install          # 安装开发依赖 + zod（唯一运行时 npm 依赖）
 pnpm run typecheck    # tsc --noEmit（通过 ../dsh 解析 DSH 源码）
 pnpm test             # vitest run
-pnpm run build        # tsc + tsdown → lib/index.js, lib/invariant.js, lib/client.js
+pnpm run build        # tsc + tsdown → lib/index.js, lib/client.js
 ```
 
 ### 类型检查
@@ -95,13 +97,12 @@ dsh plugin --profile web add "link:D:/Projects/deepseek-harness/yet-another-suba
 ```sh
 pnpm run typecheck    # 0 errors
 pnpm test             # 55 tests passing
-pnpm run build        # lib/index.js + lib/invariant.js + lib/client.js
+pnpm run build        # lib/index.js + lib/client.js
 ```
 
 ### 产物验证
 
 - `lib/index.js` — Host bundle
-- `lib/invariant.js` — Invariant companion
 - `lib/client.js` — Client bundle（CSS-modules inline，`d` 前缀 hash 防 CSS 类名数字开头）
 - `cordis.patch.yml` — Bundle patch layer
 

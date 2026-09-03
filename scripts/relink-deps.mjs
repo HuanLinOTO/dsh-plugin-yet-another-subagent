@@ -28,7 +28,6 @@ const LINKS = {
   '@deepseek-ai/dsh-client-ui-slots': join(BUILT, 'packages', 'client', 'ui-slots'),
   '@deepseek-ai/dsh-client-ui-renderer': join(BUILT, 'packages', 'client', 'ui-renderer'),
   '@deepseek-ai/dsh-client-ui-tool': join(BUILT, 'packages', 'client', 'ui-tool'),
-  '@deepseek-ai/dsh-invariants': join(BUILT, 'packages', 'runtime-diagnostics', 'invariants'),
   '@deepseek-ai/dsh-jobs': join(BUILT, 'packages', 'jobs', 'jobs'),
   '@deepseek-ai/dsh-llm': join(BUILT, 'packages', 'llm', 'llm'),
   '@deepseek-ai/dsh-session': join(BUILT, 'packages', 'core', 'session'),

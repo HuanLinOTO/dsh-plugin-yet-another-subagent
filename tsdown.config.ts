@@ -2,7 +2,7 @@
  * Dev/CI tsdown config: emits three artifacts:
  *
  *   - `lib/index.js`      — node half (plain ESM, bundles src/index.ts)
- *   - `lib/invariant.js`  — node half (plain ESM, bundles src/invariant.ts)
+ *   - `lib/index.js`     — node half (plain ESM, bundles src/index.ts)
  *   - `lib/client.js`     — browser half (CJS wrapped in DSH's
  *                            `window.__ModuleLoader__.load({id, factory})`
  *                            so the client module loader can compose it)
@@ -136,7 +136,6 @@ const NODE_EXTERNALS = [
   '@deepseek-ai/dsh-llm',
   '@deepseek-ai/dsh-settings',
   '@deepseek-ai/dsh-util-values',
-  '@deepseek-ai/dsh-invariants',
   '@deepseek-ai/dsh-client-connection',
   '@deepseek-ai/dsh-client-connection/client',
   '@deepseek-ai/dsh-client-locale',
@@ -153,7 +152,7 @@ const NODE_EXTERNALS = [
 
 const libConfig: UserConfig = {
   name: ID,
-  entry: { index: 'src/index.ts', invariant: 'src/invariant.ts' },
+  entry: { index: 'src/index.ts' },
   outDir: 'lib',
   format: ['esm'],
   platform: 'node',

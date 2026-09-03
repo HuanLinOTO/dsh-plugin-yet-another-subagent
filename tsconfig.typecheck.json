@@ -17,7 +17,6 @@
       "@deepseek-ai/dsh-jobs": ["C:/Users/Administrator/.dsh/source/current/packages/jobs/jobs/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-llm": ["C:/Users/Administrator/.dsh/source/current/packages/llm/llm/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-settings": ["C:/Users/Administrator/.dsh/source/current/packages/settings/settings/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-invariants": ["C:/Users/Administrator/.dsh/source/current/packages/runtime-diagnostics/invariants/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-client-connection": ["C:/Users/Administrator/.dsh/source/current/packages/client/connection/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-client-connection/client": ["C:/Users/Administrator/.dsh/source/current/packages/client/connection/lib/types/client/index.d.ts"],
       "@deepseek-ai/dsh-client-locale": ["C:/Users/Administrator/.dsh/source/current/packages/client/locale/lib/types/index.d.ts"],

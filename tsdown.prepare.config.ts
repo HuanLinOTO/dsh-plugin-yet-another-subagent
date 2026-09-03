@@ -17,15 +17,6 @@ export default defineConfig([
     clean: true,
   },
   {
-    entry: ['src/invariant.ts'],
-    outDir: 'lib',
-    format: ['esm'],
-    platform: 'node',
-    target: 'es2024',
-    dts: false,
-    clean: false,
-  },
-  {
     entry: { client: 'src/client/index.ts' },
     outDir: 'lib',
     format: ['esm'],
