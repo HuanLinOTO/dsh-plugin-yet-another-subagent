@@ -15,12 +15,11 @@
  * Both units are pure synchronous folds; the framework drives them and the
  * host wire layer ships the validated views.
  *
- * Alpha.3 change-feed contract (`@deepseek-ai/dsh-session-projection`): the
- * drive publishes a client view only when its raw output changes by
- * `Object.is`, so an object-valued view MUST reuse its reference while the
- * wire content is unchanged — a fresh object per call republishes on every
- * internal-only state change (e.g. the excluded `streamingText`
- * accumulator). Both `view`s below go through {@link memoizeView} for that
+ * Change-feed contract (`@deepseek-ai/dsh-session-projection`): the drive
+ * publishes a client view only when its raw output changes by `Object.is`, so
+ * an object-valued view MUST reuse its reference while the wire content is
+ * unchanged — a fresh object per call republishes on every internal-only
+ * state change. Both `view`s below go through {@link memoizeView} for that
  * reference-stability guarantee.
  *
  * @module @huanlin/dsh-plugin-yet-another-subagent/projection
@@ -31,18 +30,18 @@ import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
 // ---------------------------------------------------------------------------
-// View reference stability (alpha.3 `Object.is` change-feed gate)
+// View reference stability (`Object.is` change-feed gate)
 // ---------------------------------------------------------------------------
 
 /**
  * Wrap a pure view builder so equal content reuses the SAME object reference.
  *
- * The alpha.3 projection drive keeps the two latest raw `view` results per
- * session cell and publishes only when they differ by `Object.is`. A view
- * that allocates a fresh object per call defeats that gate; this wrapper
- * returns the previous object whenever the newly built one is content-equal
- * (`equal`) or the state reference is unchanged (repeated reads of the same
- * cell). The memo is shared across sessions folded by the unit — returning a
+ * The projection drive keeps the two latest raw `view` results per session
+ * cell and publishes only when they differ by `Object.is`. A view that
+ * allocates a fresh object per call defeats that gate; this wrapper returns
+ * the previous object whenever the newly built one is content-equal (`equal`)
+ * or the state reference is unchanged (repeated reads of the same cell). The
+ * memo is shared across sessions folded by the unit — returning a
  * content-equal reference from another session's earlier state is still
  * correct, since each session's gate only compares its own consecutive
  * results and a stable reference satisfies it identically.
@@ -160,7 +159,7 @@ export const subagentProfileProjection = {
     viewSchema: profileViewSchema,
     // Memoized: a `tool/result` that only consumes a pending callId (no
     // childId extracted) changes the fold state but not the wire content —
-    // the stable reference keeps the alpha.3 change feed quiet.
+    // the stable reference keeps the change feed quiet.
     view: memoizeView(
       state => ({ children: state.mapping, calls: state.callToChild }),
       (a, b) => recordEqual(a.children, b.children) && recordEqual(a.calls, b.calls),
@@ -285,7 +284,7 @@ export interface YaSubagentProgressProjection {
   }
   /** Lifecycle state derived from turn boundaries. */
   readonly state: 'running' | 'idle' | 'settled'
-  /** Latest activity: streaming text, tool call, or finalized message text. */
+  /** Latest activity: a tool call or the finalized message text. */
   readonly activity?: Activity
 }
 
@@ -304,8 +303,6 @@ interface ProgressState {
     readonly reasoning: number
   }
   readonly state: 'running' | 'idle' | 'settled'
-  /** Accumulator for the current text block's streaming deltas. */
-  readonly streamingText: string
   readonly activity?: Activity
 }
 
@@ -327,10 +324,8 @@ const progressViewSchema = z.object({
   activity: activitySchema.optional(),
 }).strict()
 
-/** The fold state is the wire view plus the in-flight streaming accumulator. */
-const progressStateSchema = progressViewSchema.extend({
-  streamingText: z.string(),
-})
+/** The fold state equals the wire view. */
+const progressStateSchema = progressViewSchema
 
 /** Content equality for the progress view's token totals. */
 function tokensEqual(
@@ -364,16 +359,17 @@ function progressViewEqual(a: YaSubagentProgressProjection, b: YaSubagentProgres
  * Fold the child session's own events into a compact progress view. Token
  * usage accumulates from `assistant/message.usage` (cache fields are
  * optional); tool calls are counted; lifecycle follows turn boundaries.
+ * Since dsh 0.1.5 the session log carries no streaming events — activity
+ * text updates only when a message finalizes.
  */
 export const yaSubagentProgressProjection = {
   key: 'yaSubagentProgress',
   stateSchema: progressStateSchema,
-  stateVersion: 3,
+  stateVersion: 4,
   init: () => ({
     toolCallCount: 0,
     tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 },
     state: 'idle',
-    streamingText: '',
   }),
   apply: (state, event) => {
     if (event.type === 'turn/start') {
@@ -381,33 +377,6 @@ export const yaSubagentProgressProjection = {
     }
     if (event.type === 'turn/end') {
       return { ...state, state: 'idle' as const }
-    }
-    if (event.type === 'step/start') {
-      // Reset the streaming text accumulator for the new step.
-      return { ...state, streamingText: '' }
-    }
-    if (event.type === 'assistant/chunk') {
-      const chunk = (event.data as { chunk: { type: string; text?: string; name?: string; blockType?: string } }).chunk
-      // New text block starting → reset the accumulator so we show only the
-      // latest text block, not concatenated text from multiple blocks.
-      if (chunk.type === 'block-start' && chunk.blockType === 'text') {
-        return { ...state, streamingText: '' }
-      }
-      if (chunk.type === 'text-delta' && typeof chunk.text === 'string') {
-        const streamingText = state.streamingText + chunk.text
-        const truncated = truncateText(streamingText)
-        return {
-          ...state,
-          streamingText,
-          activity: { kind: 'text' as const, text: truncated },
-        }
-      }
-      // Tool-call-delta carries the tool name as soon as the model emits it,
-      // giving real-time visibility before tool/call fires.
-      if (chunk.type === 'tool-call-delta' && typeof chunk.name === 'string') {
-        return { ...state, activity: { kind: 'tool' as const, name: chunk.name } }
-      }
-      return state
     }
     if (event.type === 'tool/call') {
       return {
@@ -445,15 +414,12 @@ export const yaSubagentProgressProjection = {
   },
   wire: {
     viewSchema: progressViewSchema,
-    // Memoized: `streamingText` deltas and `step/start` resets mutate the
-    // fold state without touching the wire content once the truncated
-    // activity text has stabilized — the stable reference keeps the alpha.3
-    // change feed quiet while live deltas (pre-truncation) still publish.
+    // Memoized: events that leave every view field unchanged (e.g. an
+    // assistant/message without usage and without text blocks) mutate or
+    // clone the fold state without changing the wire content — the stable
+    // reference keeps the change feed quiet.
     view: memoizeView(
-      state => {
-        const { streamingText: _, ...rest } = state
-        return rest
-      },
+      state => state,
       progressViewEqual,
     ),
   },

@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 
 const DSH_HOME = process.env.DSH_HOME || join(homedir(), '.dsh')
-const BUILT = join(DSH_HOME, 'source', 'current')
+const BUILT = process.env.DSH_SOURCE_ROOT || join(DSH_HOME, 'source', 'current')
 const NODE_MODULES = resolve('node_modules')
 
 const LINKS = {

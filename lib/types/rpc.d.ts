@@ -1,17 +1,26 @@
 /**
- * RPC handler: profile list CRUD + tool list on a dedicated `/ya-subagent`
- * channel registered via `ctx.connection.rpc.handle('/ya-subagent', ...)`.
+ * RPC surface: profile list CRUD + tool list + session repair, exposed as
+ * exact Fetch routes on the shared `/api` channel via
+ * `ctx.connection.fetch.register(...)`.
  *
- * A dedicated channel avoids the single-interceptor limit on the shared `/api`
- * channel (the Typert gateway owns that slot; staking it here would shadow
- * `commands/execute` and every other `/api` endpoint).
+ * Why not a dedicated `rpc.handle` channel: the host-side dedicated-channel
+ * registry resolves `webServer` through the connection service's origin
+ * context chain, and the web profile mounts the webserver as a sibling
+ * loader row — never an ancestor of client-connection — so every dedicated
+ * channel fails to register with `cannot get property "webServer" without
+ * inject`. Exact Fetch routes dispatch inside the already-mounted `/api`
+ * carrier instead (the dsh-client-file-upload pattern), inheriting its
+ * Host/Origin trust fence and browser authentication for free, and the
+ * shared `/api` interceptor slot stays owned by the Typert gateway.
  *
- * Endpoints (all POST, payload shape noted):
- *   - `profiles.list`   payload: {}                          → { profiles: SubagentProfile[] }
- *   - `profiles.add`    payload: { profile: SubagentProfile } → { profiles: ... } | error
- *   - `profiles.update` payload: { profile: SubagentProfile } → { profiles: ... } | error
- *   - `profiles.remove` payload: { id: string }              → { profiles: ... } | error
- *   - `tools.list`      payload: {}                          → { tools: { name, description }[] }
+ * Wire endpoints (all POST; URL path `/api/ya-subagent.<endpoint>`, body and
+ * response use the Connection client-request / server-response envelopes):
+ *   - `ya-subagent.profiles.list`    payload: {}                            → { profiles: SubagentProfile[] }
+ *   - `ya-subagent.profiles.add`     payload: { profile: SubagentProfile }  → { profiles: ... } | error
+ *   - `ya-subagent.profiles.update`  payload: { profile: SubagentProfile }  → { profiles: ... } | error
+ *   - `ya-subagent.profiles.remove`  payload: { id: string }                → { profiles: ... } | error
+ *   - `ya-subagent.tools.list`       payload: {}                            → { tools: { name, description }[] }
+ *   - `ya-subagent.sessions.repair`  payload: {}                            → RepairStats | error
  *
  * Returns the existing RpcResult shape; business errors use the `internal`
  * code with a descriptive message (the RpcError code union is closed; we do
@@ -49,12 +58,11 @@ export interface ProfileRemovePayload {
 /** All ya-subagent RPC endpoint result values. */
 export type YaSubagentValue = ProfileListResponse | ToolListResponse | RepairStats;
 /**
- * Register the ya-subagent RPC channel on the host's connection service.
- * `connection` is in the plugin's inject list, so `ctx.connection` is
- * directly available; the channel route rolls back on fiber disposal
- * (the inner `owner.effect` owns cleanup). Trust and browser authentication
- * moved to the physical `/api` carrier in v0.1.2-alpha.1, so channels no
- * longer carry an `authority` option.
+ * Register the ya-subagent RPC routes on the host's connection service.
+ * `connection` is provided by the host; the routes roll back with the
+ * plugin fiber (each `fetch.register` disposer is collected by an effect).
+ * Trust and browser authentication live on the physical `/api` carrier, so
+ * the routes carry no authority options of their own.
  * @param ctx - host context.
  * @param store - profile store.
  */

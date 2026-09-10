@@ -19,8 +19,8 @@
  * deny is picked, populated from `tools.list` (the host's current
  * `ctx.tools.schemas()`).
  *
- * Pulls the profile list once on mount via `connection.rpc.call('/ya-subagent',
- * 'profiles.list')`, dispatches add/update/remove through the
+ * Pulls the profile list once on mount via `connection.rpc.call('/api',
+ * 'ya-subagent.profiles.list')`, dispatches add/update/remove through the
  * same RPC. The toolview slot is keyed by `subagent` and registered once at
  * plugin load, so profile mutations do not need to re-register slots.
  *

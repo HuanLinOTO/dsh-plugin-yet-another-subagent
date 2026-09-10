@@ -12,7 +12,7 @@ Bundle-style DSH plugin exposing configurable subagent profiles as model-facing 
 - **Persistence via settings seam**: profile state lives under the `ya-subagent` namespace in `$DSH_HOME/settings.yaml`. `ctx.inject(['settings'], …)` registers the namespace with cordis.yml config as composition `base`; `ProfileStore.attachScope(scope)` wires CRUD mutations to `scope.replace()`. External yaml edits hot-reload through `scope.watch` → `reloadFromScope` → `syncTools`. Headless assemblies (no settings provider) fall back to in-memory state.
 - **Profile = tool instance**: each user-configured profile maps to a `subagent_<profile_id>` tool registered via `ctx.tools.register(defineTool(...))`. Reuses official `spawn` provider via `ctx.subagents.startContinuable`.
 - **ProfileLabel in result content**: tool execute embeds `profileLabel` in the continuable result content (`started <label> subagent <id>`), so SubagentCard reads it with zero RPC (SkillRow paradigm).
-- **Profile CRUD via a dedicated RPC channel**: `profiles.list`/`.add`/`.update`/`.remove`/`tools.list` on the `/ya-subagent` channel (`rpc.handle` — the shared `/api` channel allows only one interceptor, which the Typert gateway owns); business errors reuse the closed `internal` RpcError code with descriptive messages.
+- **Profile CRUD via exact Fetch routes on `/api`**: `ya-subagent.profiles.*`/`tools.list`/`sessions.repair` registered through `ctx.connection.fetch.register` (the host's dedicated `rpc.handle` channels cannot mount in the web profile — the webserver service is a sibling loader row, never an ancestor of the connection fiber, so the registry's internal `owner.webServer` read always fails); business errors reuse the closed `internal` RpcError code with descriptive messages.
 - **Two projections**:
   - `subagentProfile` (parent session): fold `tool/call.name` + `tool/result` content → `childId → profileId` map.
   - `yaSubagentProgress` (child session): fold `tool/call`, `assistant/message.usage`, `turn/start`, `turn/end` → live toolcall count + token totals + state.
@@ -28,7 +28,7 @@ Bundle-style DSH plugin exposing configurable subagent profiles as model-facing 
 | `src/profile-store.ts` | `ProfileStore` class with CRUD (`add`/`update`/`remove`/`list`/`get`) + `attachScope`/`reloadFromScope` for settings persistence |
 | `src/tool-factory.ts` | `buildTool(profile, ctx)` → `defineTool` options (continuable default + foreground fallback). No longer appends `ya-subagent/started` events (the persistence read path refuses any event type outside the generated `KNOWN_SESSION_EVENT_TYPES`). |
 | `src/repair.ts` | One-shot session-log repair: physically REMOVES legacy `ya-subagent/started` rows and renumbers later rows (ordinary `seq`, packed-row `seq0`, and `sourceEventSeqs` citations) so the harness can load old logs — v0.1.2-alpha.1 dropped the `ignorable` envelope flag, so stamping it no longer helps. Handles `.jsonl` and `.jsonl.zstd` (concatenated frames). Idempotent, backs up to `.bak`. |
-| `src/rpc.ts` | `registerRpc(ctx, store)` via `ctx.inject(['connection'], …)` + `rpc.handle('/ya-subagent', …)`. Endpoints: `profiles.*`, `tools.list`, `sessions.repair`. |
+| `src/rpc.ts` | `registerRpc(ctx, store)` via `ctx.inject(['connection'], …)` + `connection.fetch.register` exact routes on `/api` (`/api/ya-subagent.<endpoint>`). Endpoints: `ya-subagent.profiles.*`, `ya-subagent.tools.list`, `ya-subagent.sessions.repair`. |
 | `src/projection.ts` | `subagentProfileProjection` + `yaSubagentProgressProjection` + `SessionProjectionMap` merge |
 | `src/client/index.ts` | Client entry: `inject = ['slots', 'locale', 'sessions', 'connection']`, registers `settings.section` + per-profile `tool.call.toolview` |
 | `src/client/SubagentCard.tsx` | Keyed toolview component (parses `block.content`, subscribes child projection, click-to-open) |
@@ -57,7 +57,7 @@ pnpm run build        # tsc + tsdown → lib/index.js, lib/client.js
 1. Add the endpoint string to the `switch` in `src/rpc.ts`.
 2. Add the payload/response types to `src/rpc.ts`.
 3. Add a client caller in `src/client/SettingsPage.tsx` (or wherever consumed).
-4. The endpoint lives on the `/ya-subagent` channel (registered via `rpc.handle`, no prefix in the endpoint string).
+4. The endpoint lives on the `/api` channel as an exact Fetch route: add the name to `ENDPOINTS` in `src/rpc.ts` (wire endpoint = `ya-subagent.<name>`, route = `/api/ya-subagent.<name>`); the client caller passes the bare name through `callRpc`.
 
 ## Gotchas
 

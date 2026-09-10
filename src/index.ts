@@ -218,9 +218,11 @@ export function apply(ctx: Context, config: Config): void {
   })
 
   // 3. RPC: profile list CRUD (mutations auto-persist through the scope).
-  //    `connection` is in the plugin's inject list, so `ctx.connection` is
-  //    directly available — no need for ctx.inject(['connection'], …).
-  ctx.logger.info('ya-subagent: registering RPC channel /ya-subagent')
+  //    Exact Fetch routes below `/api` via `connection.fetch.register` — the
+  //    host's dedicated-channel registry (`rpc.handle`) cannot mount routes in
+  //    the web profile (the webserver service is a sibling loader row, not an
+  //    ancestor of the connection fiber), so dedicated channels never appear.
+  ctx.logger.info('ya-subagent: registering RPC routes /api/ya-subagent.*')
   registerRpc(ctx, store)
 
   // 4. Projections: parent-side `subagentProfile` + child-side `yaSubagentProgress`.

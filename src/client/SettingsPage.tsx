@@ -19,8 +19,8 @@
  * deny is picked, populated from `tools.list` (the host's current
  * `ctx.tools.schemas()`).
  *
- * Pulls the profile list once on mount via `connection.rpc.call('/ya-subagent',
- * 'profiles.list')`, dispatches add/update/remove through the
+ * Pulls the profile list once on mount via `connection.rpc.call('/api',
+ * 'ya-subagent.profiles.list')`, dispatches add/update/remove through the
  * same RPC. The toolview slot is keyed by `subagent` and registered once at
  * plugin load, so profile mutations do not need to re-register slots.
  *
@@ -107,7 +107,9 @@ async function callRpc<T>(
   endpoint: string,
   payload: unknown,
 ): Promise<T> {
-  return rpc.call('/ya-subagent', endpoint, payload) as Promise<T>
+  // Endpoints live on the shared `/api` channel as exact Fetch routes
+  // (`/api/ya-subagent.<endpoint>`), registered by the host half.
+  return rpc.call('/api', `ya-subagent.${endpoint}`, payload) as Promise<T>
 }
 
 /**

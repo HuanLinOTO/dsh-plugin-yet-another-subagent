@@ -49,16 +49,6 @@ function turnEndEvent(seq: number): SessionEvent {
   return { type: 'turn/end', seq, time: 0, data: { turn: 0, reason: 'completed' } } as unknown as SessionEvent
 }
 
-/** Build a minimal `assistant/chunk` event with a typed chunk payload. */
-function chunkEvent(seq: number, chunkType: string, fields: Record<string, unknown>): SessionEvent {
-  return {
-    type: 'assistant/chunk',
-    seq,
-    time: 0,
-    data: { turn: 0, step: 0, chunk: { type: chunkType, ...fields } },
-  } as unknown as SessionEvent
-}
-
 /** Build a minimal `tool/call` event that is NOT a subagent tool. */
 function foreignToolCallEvent(seq: number, callId: string): SessionEvent {
   return toolCallEvent(seq, callId, 'bash', '{}')
@@ -84,11 +74,6 @@ function assistantMessageEvent(seq: number, usage: { inputTokens?: number; outpu
       },
     },
   } as unknown as SessionEvent
-}
-
-/** Build a minimal `step/start` event. */
-function stepStartEvent(seq: number): SessionEvent {
-  return { type: 'step/start', seq, time: 0, data: { turn: 0, step: 0 } } as unknown as SessionEvent
 }
 
 describe('subagentProfileProjection', () => {
@@ -220,28 +205,6 @@ describe('yaSubagentProgressProjection', () => {
     expect(yaSubagentProgressProjection.wire.view(state).activity).toEqual({ kind: 'tool', name: 'grep', args: 'TODO' })
   })
 
-  it('folds streaming text-delta chunks into activity', () => {
-    let state = yaSubagentProgressProjection.init()
-    state = yaSubagentProgressProjection.apply(state, chunkEvent(0, 'text-delta', { text: 'Hello' }))
-    expect(yaSubagentProgressProjection.wire.view(state).activity).toEqual({ kind: 'text', text: 'Hello' })
-    state = yaSubagentProgressProjection.apply(state, chunkEvent(1, 'text-delta', { text: ' world' }))
-    expect(yaSubagentProgressProjection.wire.view(state).activity).toEqual({ kind: 'text', text: 'Hello world' })
-  })
-
-  it('folds tool-call-delta chunk name into activity', () => {
-    let state = yaSubagentProgressProjection.init()
-    state = yaSubagentProgressProjection.apply(state, chunkEvent(0, 'tool-call-delta', { name: 'grep' }))
-    expect(yaSubagentProgressProjection.wire.view(state).activity).toEqual({ kind: 'tool', name: 'grep' })
-  })
-
-  it('block-start text resets streaming text accumulator', () => {
-    let state = yaSubagentProgressProjection.init()
-    state = yaSubagentProgressProjection.apply(state, chunkEvent(0, 'text-delta', { text: 'First' }))
-    state = yaSubagentProgressProjection.apply(state, chunkEvent(1, 'block-start', { blockType: 'text' }))
-    state = yaSubagentProgressProjection.apply(state, chunkEvent(2, 'text-delta', { text: 'Second' }))
-    expect(yaSubagentProgressProjection.wire.view(state).activity).toEqual({ kind: 'text', text: 'Second' })
-  })
-
   it('assistant/message sets text activity from last text block', () => {
     let state = yaSubagentProgressProjection.init()
     state = yaSubagentProgressProjection.apply(state, assistantMessageEvent(0, { inputTokens: 10 }, ['Thinking about the task…']))
@@ -294,15 +257,15 @@ describe('yaSubagentProgressProjection', () => {
 })
 
 // ---------------------------------------------------------------------------
-// View reference stability (dsh 0.1.2-alpha.3 change feed)
+// View reference stability (dsh change feed)
 //
-// alpha.3 publishes a client view only when its raw output changes by
+// The drive publishes a client view only when its raw output changes by
 // `Object.is`; an object-valued view must therefore reuse its reference
 // while the wire content is unchanged. These specs pin the memoized views'
 // contract: same content → same reference, changed content → new reference.
 // ---------------------------------------------------------------------------
 
-describe('projection view reference stability (alpha.3 Object.is change feed)', () => {
+describe('projection view reference stability (Object.is change feed)', () => {
   it('subagentProfile keeps one reference while pending entries churn without mapping changes', () => {
     const view = subagentProfileProjection.wire.view
     const empty = subagentProfileProjection.init()
@@ -338,12 +301,10 @@ describe('projection view reference stability (alpha.3 Object.is change feed)', 
 
   it('yaSubagentProgress keeps its reference across view-invisible state changes', () => {
     const view = yaSubagentProgressProjection.wire.view
-    // `step/start` only resets the excluded streamingText accumulator.
+    // Repeated reads of the same state share one reference (registry replays).
     let state = yaSubagentProgressProjection.init()
-    state = yaSubagentProgressProjection.apply(state, chunkEvent(0, 'text-delta', { text: 'Hello' }))
-    const withText = view(state)
-    state = yaSubagentProgressProjection.apply(state, stepStartEvent(1))
-    expect(view(state)).toBe(withText)
+    const baseline = view(state)
+    expect(view(state)).toBe(baseline)
     // assistant/message without usage and without text blocks changes nothing visible.
     state = yaSubagentProgressProjection.apply(state, {
       type: 'assistant/message',
@@ -351,26 +312,26 @@ describe('projection view reference stability (alpha.3 Object.is change feed)', 
       time: 0,
       data: { turn: 0, step: 0, message: { id: 'm' as never, role: 'assistant', content: [], source: { kind: 'model' } } },
     } as unknown as SessionEvent)
-    expect(view(state)).toBe(withText)
+    expect(view(state)).toBe(baseline)
   })
 
-  it('yaSubagentProgress publishes live deltas but stays quiet once truncated text stabilizes', () => {
+  it('yaSubagentProgress publishes text activity changes but stays quiet once truncated text stabilizes', () => {
     const view = yaSubagentProgressProjection.wire.view
     let state = yaSubagentProgressProjection.init()
     const idle = view(state)
-    // Live text delta → content changes → NEW reference (publication fires).
-    state = yaSubagentProgressProjection.apply(state, chunkEvent(0, 'text-delta', { text: 'Hello' }))
-    const streaming = view(state)
-    expect(streaming).not.toBe(idle)
+    // A finalized message with text → content changes → NEW reference.
+    state = yaSubagentProgressProjection.apply(state, assistantMessageEvent(0, { inputTokens: 10 }, ['Hello']))
+    const withText = view(state)
+    expect(withText).not.toBe(idle)
     // Past LAST_TEXT_MAX the truncated activity string is stable: further
-    // deltas keep the fold state moving (streamingText) but must NOT flip
-    // the view reference.
-    state = yaSubagentProgressProjection.apply(state, chunkEvent(1, 'text-delta', { text: 'a'.repeat(200) }))
+    // finalized messages that extend the same prefix truncate to identical
+    // text, so the fold state moves but the view reference must NOT flip.
+    state = yaSubagentProgressProjection.apply(state, assistantMessageEvent(1, {}, ['a'.repeat(200)]))
     const saturated = view(state)
-    expect(saturated).not.toBe(streaming)
-    state = yaSubagentProgressProjection.apply(state, chunkEvent(2, 'text-delta', { text: 'b' }))
+    expect(saturated).not.toBe(withText)
+    state = yaSubagentProgressProjection.apply(state, assistantMessageEvent(2, {}, ['a'.repeat(200) + 'b']))
     expect(view(state)).toBe(saturated)
-    state = yaSubagentProgressProjection.apply(state, chunkEvent(3, 'text-delta', { text: 'c' }))
+    state = yaSubagentProgressProjection.apply(state, assistantMessageEvent(3, {}, ['a'.repeat(200) + 'c']))
     expect(view(state)).toBe(saturated)
     // A real change (tool call) still publishes.
     state = yaSubagentProgressProjection.apply(state, toolCallEvent(4, 'c1', 'grep', '{"pattern":"TODO"}'))

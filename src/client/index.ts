@@ -105,7 +105,9 @@ export function apply(ctx: ClientContext): void {
     for (const p of profiles) profileLabels.set(p.id, p.label)
   }
   const fetchProfilesInternal = async (): Promise<readonly SubagentProfile[]> => {
-    const result = await connection.rpc.call('/ya-subagent', 'profiles.list', {}) as ProfileListResult
+    // Exact Fetch routes below `/api` (registered by the host half); the
+    // shared channel carries the trust fence and browser authentication.
+    const result = await connection.rpc.call('/api', 'ya-subagent.profiles.list', {}) as ProfileListResult
     return result.ok ? result.value.profiles : []
   }
   void fetchProfilesInternal().then(refreshProfileLabels).catch((error: unknown) => {

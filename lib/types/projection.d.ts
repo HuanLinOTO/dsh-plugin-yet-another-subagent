@@ -15,12 +15,11 @@
  * Both units are pure synchronous folds; the framework drives them and the
  * host wire layer ships the validated views.
  *
- * Alpha.3 change-feed contract (`@deepseek-ai/dsh-session-projection`): the
- * drive publishes a client view only when its raw output changes by
- * `Object.is`, so an object-valued view MUST reuse its reference while the
- * wire content is unchanged — a fresh object per call republishes on every
- * internal-only state change (e.g. the excluded `streamingText`
- * accumulator). Both `view`s below go through {@link memoizeView} for that
+ * Change-feed contract (`@deepseek-ai/dsh-session-projection`): the drive
+ * publishes a client view only when its raw output changes by `Object.is`, so
+ * an object-valued view MUST reuse its reference while the wire content is
+ * unchanged — a fresh object per call republishes on every internal-only
+ * state change. Both `view`s below go through {@link memoizeView} for that
  * reference-stability guarantee.
  *
  * @module @huanlin/dsh-plugin-yet-another-subagent/projection
@@ -93,7 +92,7 @@ export interface YaSubagentProgressProjection {
     };
     /** Lifecycle state derived from turn boundaries. */
     readonly state: 'running' | 'idle' | 'settled';
-    /** Latest activity: streaming text, tool call, or finalized message text. */
+    /** Latest activity: a tool call or the finalized message text. */
     readonly activity?: Activity;
 }
 /** Discriminated activity union: text or tool call. */
@@ -115,14 +114,14 @@ interface ProgressState {
         readonly reasoning: number;
     };
     readonly state: 'running' | 'idle' | 'settled';
-    /** Accumulator for the current text block's streaming deltas. */
-    readonly streamingText: string;
     readonly activity?: Activity;
 }
 /**
  * Fold the child session's own events into a compact progress view. Token
  * usage accumulates from `assistant/message.usage` (cache fields are
  * optional); tool calls are counted; lifecycle follows turn boundaries.
+ * Since dsh 0.1.5 the session log carries no streaming events — activity
+ * text updates only when a message finalizes.
  */
 export declare const yaSubagentProgressProjection: {
     key: "yaSubagentProgress";
@@ -144,7 +143,6 @@ export declare const yaSubagentProgressProjection: {
             name: z.ZodString;
             args: z.ZodOptional<z.ZodString>;
         }, z.core.$strict>]>>;
-        streamingText: z.ZodString;
     }, z.core.$strict>;
     stateVersion: number;
     init: () => {
@@ -157,7 +155,6 @@ export declare const yaSubagentProgressProjection: {
             reasoning: number;
         };
         state: "idle";
-        streamingText: string;
     };
     apply: (state: NoInfer<ProgressState>, event: SessionEvent) => ProgressState;
     wire: {
@@ -180,18 +177,7 @@ export declare const yaSubagentProgressProjection: {
                 args: z.ZodOptional<z.ZodString>;
             }, z.core.$strict>]>>;
         }, z.core.$strict>;
-        view: (state: NoInfer<ProgressState>) => {
-            toolCallCount: number;
-            tokens: {
-                readonly input: number;
-                readonly output: number;
-                readonly cacheRead: number;
-                readonly cacheWrite: number;
-                readonly reasoning: number;
-            };
-            state: "running" | "idle" | "settled";
-            activity?: Activity;
-        };
+        view: (state: NoInfer<ProgressState>) => ProgressState;
     };
 };
 /** Convenience: the projection keys registered by this plugin. */

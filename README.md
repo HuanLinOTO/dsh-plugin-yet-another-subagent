@@ -18,7 +18,7 @@
   - 单一 `subagent` 工具，通过 `profile` 枚举参数选择 profile（非每 profile 一个工具）
   - 复用官方 `spawn` provider，支持前台（foreground）和后台（continuable / one-shot）两种模式
   - Profile 状态通过 settings seam 持久化到 `$DSH_HOME/settings.yaml`
-  - RPC CRUD：`profiles.list` / `.add` / `.update` / `.remove`（专用 `/ya-subagent` 通道，不共享 `/api`）
+  - RPC CRUD：`ya-subagent.profiles.*` / `.tools.list` / `.sessions.repair`（`/api` 上的 exact Fetch route，经 `connection.fetch.register` 注册）
   - 两个 session projection：`subagentProfile`（父会话 childId→profileId 映射 + callId→childId）+ `yaSubagentProgress`（子会话实时 toolcall/token/活动状态）；wire view 已做引用记忆化，适配 dsh 0.1.2-alpha.3 起 change feed 的 `Object.is` 下发门控（内容不变即静默）
 - **Client 半**（`src/client/index.ts`）：
   - `settings.section` — Profile 编辑页
@@ -114,17 +114,27 @@ Profile 状态通过 DSH settings seam 持久化到 `$DSH_HOME/settings.yaml` �
 
 ## RPC API
 
-Profile CRUD 走 host 的专用 `/ya-subagent` 通道（不共享 `/api`，避免与 Typert gateway 的单拦截器冲突）：
+Profile CRUD 走 `/api` 通道上的 exact Fetch route（`ctx.connection.fetch.register`，与官方
+dsh-client-file-upload 同模式）。不占用 `/api` 的单拦截器槽（该槽归 Typert gateway 所有）；
+信任栅栏与浏览器认证由 `/api` 载体统一执行。
 
-| endpoint | payload | result (ok) |
+| endpoint（wire method） | payload | result (ok) |
 |----------|---------|-------------|
-| `profiles.list` | `{}` | `{ profiles: SubagentProfile[] }` |
-| `profiles.add` | `{ profile: SubagentProfile }` | `{ profiles: SubagentProfile[] }` |
-| `profiles.update` | `{ profile: SubagentProfile }` | `{ profiles: SubagentProfile[] }` |
-| `profiles.remove` | `{ id: string }` | `{ profiles: SubagentProfile[] }` |
-| `tools.list` | `{}` | `{ tools: { name, description }[] }` |
+| `ya-subagent.profiles.list` | `{}` | `{ profiles: SubagentProfile[] }` |
+| `ya-subagent.profiles.add` | `{ profile: SubagentProfile }` | `{ profiles: SubagentProfile[] }` |
+| `ya-subagent.profiles.update` | `{ profile: SubagentProfile }` | `{ profiles: SubagentProfile[] }` |
+| `ya-subagent.profiles.remove` | `{ id: string }` | `{ profiles: SubagentProfile[] }` |
+| `ya-subagent.tools.list` | `{}` | `{ tools: { name, description }[] }` |
+| `ya-subagent.sessions.repair` | `{}` | `RepairStats` |
 
-URL 形如 `POST /ya-subagent/profiles.list`。业务错误返回 `{ ok: false, error: { code: 'internal', message } }`。
+URL 形如 `POST /api/ya-subagent.profiles.list`（Connection client-request envelope，响应为
+server-response envelope）。业务错误返回 `{ ok: false, error: { code: 'internal', message } }`。
+
+> 历史注：v0.3.x 走 `connection.rpc.handle('/ya-subagent', …)` 专用通道；dsh 0.1.5 的
+> 专用通道注册在 web profile 拓扑下无法挂载（webserver 服务与 connection 是兄弟 loader
+> 行，`rpc.handle` 内部的 `owner.webServer` 解析永远失败），浏览器侧表现为
+> `transport failure for /ya-subagent/profiles.list: HTTP 405`。v0.4.0 起改用 exact
+> Fetch route。
 
 ## 已知限制
 
