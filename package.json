@@ -1,6 +1,6 @@
 {
   "name": "@huanlin/dsh-plugin-yet-another-subagent",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "publishConfig": {
     "access": "public"
   },
