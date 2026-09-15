@@ -18,7 +18,7 @@
  */
 
 import type { Context } from 'cordis'
-import z from 'schemastery'
+import z from '@deepseek-ai/schemastery'
 // Type import also triggers `declare module 'cordis'` merge for `ctx.agents`
 // and the typed `agent/created` event (via dsh-agent's declaration).
 import type { Agent } from '@deepseek-ai/dsh-agent'

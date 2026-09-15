@@ -125,7 +125,7 @@ const cssModulesPlugin = {
 /** Peer deps that stay external in the node bundle (provided by the dsh host). */
 const NODE_EXTERNALS = [
   'cordis',
-  'schemastery',
+  '@deepseek-ai/schemastery',
   '@deepseek-ai/dsh-agent',
   '@deepseek-ai/dsh-subagent',
   '@deepseek-ai/dsh-session',

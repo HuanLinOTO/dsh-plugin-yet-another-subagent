@@ -4,7 +4,6 @@
     "paths": {
       "cordis": ["D:/Projects/deepseek-harness/dsh/vendor/cordis/lib/types/index.d.ts"],
       "@deepseek-ai/cordis": ["D:/Projects/deepseek-harness/dsh/vendor/cordis/lib/types/index.d.ts"],
-      "schemastery": ["D:/Projects/deepseek-harness/dsh/vendor/schemastery/lib/types/index.d.ts"],
       "@deepseek-ai/schemastery": ["D:/Projects/deepseek-harness/dsh/vendor/schemastery/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-agent": ["D:/Projects/deepseek-harness/dsh/packages/core/agent/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-api-session-controller": ["D:/Projects/deepseek-harness/dsh/packages/api/session-controller/lib/types/index.d.ts"],

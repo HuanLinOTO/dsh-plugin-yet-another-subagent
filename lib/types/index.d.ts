@@ -17,7 +17,7 @@
  * @module @huanlin/dsh-plugin-yet-another-subagent
  */
 import type { Context } from 'cordis';
-import z from 'schemastery';
+import z from '@deepseek-ai/schemastery';
 import type { YaSubagentConfig } from './types.ts';
 export declare const name = "yet-another-subagent";
 export declare const inject: string[];

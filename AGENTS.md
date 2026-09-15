@@ -7,7 +7,7 @@ Bundle-style DSH plugin exposing configurable subagent profiles as model-facing 
 ## Key conventions
 
 - **Bundle form**: `cordis.patch.yml` disables two official rows + inserts one plugin row; `package.json` has `dsh.bundle.patch`. No source patches to DSH staging.
-- **Peer deps**: cordis + schemastery + `@deepseek-ai/dsh-*` (provided by host). `zod` is the only runtime npm dep.
+- **Peer deps**: cordis + `@deepseek-ai/schemastery` (rescoped from bare `schemastery` in dsh 0.1.5; the host module closure no longer serves the bare name) + `@deepseek-ai/dsh-*` (provided by host). `zod` is the only runtime npm dep.
 - **Single bundle, dual entry**: `.` (host), `./client` (browser). No `./invariant` entry: since dsh 0.1.2-rc.1 the invariant rule forbids empty installers, and this plugin's registrations (tools/RPC/projections) have no independent divergent runtime observation — the export, `src/invariant.ts`, and the `dsh-invariants` peer dep were removed in the rc.1 migration.
 - **Persistence via settings seam**: profile state lives under the `ya-subagent` namespace in `$DSH_HOME/settings.yaml`. `ctx.inject(['settings'], …)` registers the namespace with cordis.yml config as composition `base`; `ProfileStore.attachScope(scope)` wires CRUD mutations to `scope.replace()`. External yaml edits hot-reload through `scope.watch` → `reloadFromScope` → `syncTools`. Headless assemblies (no settings provider) fall back to in-memory state.
 - **Profile = tool instance**: each user-configured profile maps to a `subagent_<profile_id>` tool registered via `ctx.tools.register(defineTool(...))`. Reuses official `spawn` provider via `ctx.subagents.startContinuable`.
