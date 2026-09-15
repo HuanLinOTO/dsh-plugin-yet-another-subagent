@@ -123,10 +123,18 @@ export function apply(ctx: ClientContext): void {
   // The generated session Remote serves `session/modelCatalog` on the shared
   // `/api` channel (endpoint = namespace/method); the plugin reads it through
   // the generic RPC caller instead of taking a dependency on the generated
-  // Remote assembly.
+  // Remote assembly. Gateway Remote wire convention: the payload must wrap the
+  // call arguments as exactly one plain-object `args` field — a bare `{}` is
+  // rejected by the host request parser ("Remote payload must contain exactly
+  // one plain-object args field"), so even the no-argument method sends
+  // `{ args: {} }`.
   const fetchModelCatalogInternal = async (): Promise<ModelCatalogData | undefined> => {
-    const result = await connection.rpc.call('/api', 'session/modelCatalog', {}) as ModelCatalogResult
-    return result.ok ? result.value : undefined
+    const result = await connection.rpc.call('/api', 'session/modelCatalog', { args: {} }) as ModelCatalogResult
+    if (!result.ok) {
+      ctx.logger.warn('ya-subagent: model catalog fetch failed:', result.error.message)
+      return undefined
+    }
+    return result.value
   }
 
   // ---- Single toolview slot (key: 'subagent') ---------------------------
