@@ -31,7 +31,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ClientConnectionRpc, RpcResult } from '@deepseek-ai/dsh-client-connection/client'
-import { IconChevronDownOutline14, Menu, Modal, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
+// Type-only: pulls the 'plugins.row.config' SlotMap row (the Plugins page owner).
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
+import { IconChevronDownOutlineMedium, Menu, Modal, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SubagentProfile } from '../types.ts'
 import type { ProfileListResponse, ToolListResponse } from '../rpc.ts'
@@ -57,8 +59,8 @@ export interface YaSubagentSettingsInjected {
   readonly t: (key: string) => string
 }
 
-/** Full props: settings.section runtime share + locale seat + inject. */
-type SettingsPageProps = PropsRuntime<'settings.section'> & PropsLocale<'ya-subagent'> & YaSubagentSettingsInjected
+/** Full props: plugins.row.config runtime share + locale seat + inject. */
+type SettingsPageProps = PropsRuntime<'plugins.row.config'> & PropsLocale<'ya-subagent'> & YaSubagentSettingsInjected
 
 type ProfileListResult = RpcResult<ProfileListResponse>
 type ToolListResult = RpcResult<ToolListResponse>
@@ -114,10 +116,10 @@ async function callRpc<T>(
 
 /**
  * Render the subagent profiles settings page.
- * @param props - settings.section runtime share + locale + inject.
- * @returns the page element.
+ * @param props - plugins.row.config runtime share + locale + inject.
+ * @returns the page element (summary one-liner for `view: 'summary'`).
  */
-export function SettingsPage({ rpc, fetchProfiles, fetchModelCatalog, t }: SettingsPageProps) {
+export function SettingsPage({ view, rpc, fetchProfiles, fetchModelCatalog, t }: SettingsPageProps) {
   const [profiles, setProfiles] = useState<readonly SubagentProfile[]>([])
   const [drafts, setDrafts] = useState<readonly SubagentProfile[]>([])
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
@@ -228,6 +230,9 @@ export function SettingsPage({ rpc, fetchProfiles, fetchModelCatalog, t }: Setti
     setAddingNew(false)
     setNewDraft(emptyDraft())
   }
+
+  // The Plugins page asks a row for a one-liner when it has no description.
+  if (view === 'summary') return <p className={css.empty}>{t('page.title')}</p>
 
   return (
     <section className={css.section}>
@@ -667,7 +672,7 @@ function MultiSelect({ options, value, onChange, t }: MultiSelectProps) {
     <div className={css.multiSelect} ref={containerRef}>
       <button type="button" className={css.msButton} onClick={() => setOpen(prev => !prev)}>
         <span className={css.msButtonLabel}>{label}</span>
-        <IconChevronDownOutline14 className={css.msCaret} />
+        <IconChevronDownOutlineMedium className={css.msCaret} />
       </button>
       {open && (
         <div className={css.msPopup}>
@@ -745,7 +750,7 @@ function DropdownPicker({ value, placeholder, items, disabled, onSelect }: Dropd
           <span className={css.dropdownButtonLabel}>
             {selectedLabel ?? placeholder}
           </span>
-          <IconChevronDownOutline14 className={css.dropdownCaret} />
+          <IconChevronDownOutlineMedium className={css.dropdownCaret} />
         </button>
       )}
     />

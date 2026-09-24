@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Context, type Context as Ctx } from 'cordis'
+import { Context, type Context as Ctx } from '@deepseek-ai/cordis'
 import { registerRpc } from '../src/rpc.ts'
 import { ProfileStore } from '../src/profile-store.ts'
 import type { SubagentProfile, YaSubagentConfig } from '../src/types.ts'

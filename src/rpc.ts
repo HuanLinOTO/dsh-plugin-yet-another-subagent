@@ -29,8 +29,8 @@
  * @module @huanlin/dsh-plugin-yet-another-subagent/rpc
  */
 
-import type { Context } from 'cordis'
-// Value import triggers `declare module 'cordis'` merge for `ctx.connection`.
+import type { Context } from '@deepseek-ai/cordis'
+// Type import triggers `declare module '@deepseek-ai/cordis'` merge for `ctx.connection`.
 import type {} from '@deepseek-ai/dsh-client-connection'
 import { API_PATH } from '@deepseek-ai/dsh-client-connection'
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
@@ -165,9 +165,11 @@ async function handleEnvelopeRequest(
  * Build the endpoint dispatcher over the profile store.
  * @param ctx - host context (`ctx.tools` for the tool list, `ctx.get('dshHomePath')` for repair).
  * @param store - profile store.
+ * @param onProfilesChanged - called after a successful profile mutation so the
+ *   caller can re-register the model-facing tool against the new list.
  * @returns the dispatcher mapping an endpoint name to its result.
  */
-function createDispatcher(ctx: Context, store: ProfileStore) {
+function createDispatcher(ctx: Context, store: ProfileStore, onProfilesChanged: () => void) {
   return async (endpoint: string, payload: unknown): Promise<ConnectionRpcResult<YaSubagentValue>> => {
     switch (endpoint) {
       case 'ya-subagent.profiles.list':
@@ -176,19 +178,25 @@ function createDispatcher(ctx: Context, store: ProfileStore) {
         const p = payload as ProfileAddPayload | undefined
         if (p === undefined || typeof p !== 'object' || p === null) return fail('payload must be { profile: SubagentProfile }')
         const result = store.add(p.profile)
-        return result.ok ? ok({ profiles: result.profiles }) : fail(result.error)
+        if (!result.ok) return fail(result.error)
+        onProfilesChanged()
+        return ok({ profiles: result.profiles })
       }
       case 'ya-subagent.profiles.update': {
         const p = payload as ProfileUpdatePayload | undefined
         if (p === undefined || typeof p !== 'object' || p === null) return fail('payload must be { profile: SubagentProfile }')
         const result = store.update(p.profile)
-        return result.ok ? ok({ profiles: result.profiles }) : fail(result.error)
+        if (!result.ok) return fail(result.error)
+        onProfilesChanged()
+        return ok({ profiles: result.profiles })
       }
       case 'ya-subagent.profiles.remove': {
         const p = payload as ProfileRemovePayload | undefined
         if (p === undefined || typeof p !== 'object' || p === null) return fail('payload must be { id: string }')
         const result = store.remove(p.id)
-        return result.ok ? ok({ profiles: result.profiles }) : fail(result.error)
+        if (!result.ok) return fail(result.error)
+        onProfilesChanged()
+        return ok({ profiles: result.profiles })
       }
       case 'ya-subagent.tools.list': {
         // ctx.tools is injected; schemas() returns one deep-cloned schema
@@ -230,8 +238,10 @@ function createDispatcher(ctx: Context, store: ProfileStore) {
  * the routes carry no authority options of their own.
  * @param ctx - host context.
  * @param store - profile store.
+ * @param onProfilesChanged - called after a successful profile mutation so the
+ *   caller re-registers the model-facing tool against the new list.
  */
-export function registerRpc(ctx: Context, store: ProfileStore): void {
+export function registerRpc(ctx: Context, store: ProfileStore, onProfilesChanged: () => void = () => {}): void {
   ctx.logger.info('ya-subagent: connection service available, registering /api/ya-subagent.* Fetch routes')
   ctx.inject(['connection'], (rpcCtx) => {
     const connection = rpcCtx.connection as {
@@ -244,7 +254,7 @@ export function registerRpc(ctx: Context, store: ProfileStore): void {
         }) => () => Promise<void>
       }
     }
-    const dispatch = createDispatcher(rpcCtx, store)
+    const dispatch = createDispatcher(rpcCtx, store, onProfilesChanged)
     for (const endpoint of ENDPOINTS) {
       const wireEndpoint = `ya-subagent.${endpoint}`
       const path = `${API_PATH}/${wireEndpoint}`

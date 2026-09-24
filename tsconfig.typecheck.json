@@ -18,6 +18,12 @@
       "@deepseek-ai/dsh-settings": ["D:/Projects/deepseek-harness/dsh/packages/settings/settings/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-client-connection": ["D:/Projects/deepseek-harness/dsh/packages/client/connection/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-client-connection/client": ["D:/Projects/deepseek-harness/dsh/packages/client/connection/lib/types/client/index.d.ts"],
+      "@deepseek-ai/dsh-client-ui-plugin-manager": ["D:/Projects/deepseek-harness/dsh/packages/client/ui-plugin-manager/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-client-ui-plugin-manager/client": ["D:/Projects/deepseek-harness/dsh/packages/client/ui-plugin-manager/lib/types/client/index.d.ts"],
+      "@deepseek-ai/dsh-client-ui-workspace": ["D:/Projects/deepseek-harness/dsh/packages/client/ui-workspace/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-client-ui-workspace/client": ["D:/Projects/deepseek-harness/dsh/packages/client/ui-workspace/lib/types/client/index.d.ts"],
+      "@deepseek-ai/dsh-client-ui-session": ["D:/Projects/deepseek-harness/dsh/packages/client/ui-session/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-client-ui-session/client": ["D:/Projects/deepseek-harness/dsh/packages/client/ui-session/lib/types/client/index.d.ts"],
       "@deepseek-ai/dsh-client-locale": ["D:/Projects/deepseek-harness/dsh/packages/client/locale/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-client-locale/client": ["D:/Projects/deepseek-harness/dsh/packages/client/locale/lib/types/client/index.d.ts"],
       "@deepseek-ai/dsh-client-ui-slots": ["D:/Projects/deepseek-harness/dsh/packages/client/ui-slots/lib/types/index.d.ts"],
@@ -30,7 +36,8 @@
       "@deepseek-ai/dsh-client-ui-conversation": ["D:/Projects/deepseek-harness/dsh/packages/client/ui-conversation/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-client-ui-conversation/client": ["D:/Projects/deepseek-harness/dsh/packages/client/ui-conversation/lib/types/client/index.d.ts"],
       "@deepseek-ai/dsh-client-ui-primitives": ["D:/Projects/deepseek-harness/dsh/packages/client/ui-primitives/lib/types/index.d.ts"],
-      "@deepseek-ai/dsh-util-values": ["D:/Projects/deepseek-harness/dsh/packages/util/values/lib/types/index.d.ts"]
+      "@deepseek-ai/dsh-util-values": ["D:/Projects/deepseek-harness/dsh/packages/util/values/lib/types/index.d.ts"],
+      "zod": ["./node_modules/zod"]
     }
   },
   "include": ["src"]

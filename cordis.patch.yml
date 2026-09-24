@@ -5,9 +5,12 @@
 - id: tool-subagent
   disabled: true
 
-# Insert this plugin.
+# Insert this plugin. The row id doubles as the settings/profile entry id
+# (dsh 0.1.7-rc.1 DSH-0.1.7-RC1-04): it is deliberately kept as the legacy
+# `ya-subagent` namespace so the host's one-time `$DSH_HOME/settings.yaml`
+# import maps the existing profile section onto this entry.
 - insert:
-    - id: yet-another-subagent
+    - id: ya-subagent
       name: '@huanlin/dsh-plugin-yet-another-subagent'
       config:
         profiles:
@@ -16,6 +19,6 @@
             model: { kind: 'auto' }
             persona: { kind: 'inherit' }
             toolFilter: { kind: 'none' }
-            maxDepth: 3
+            maxDepth: 1
             builtin: true
         generalFixed: true

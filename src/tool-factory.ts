@@ -18,7 +18,7 @@
  * @module @huanlin/dsh-plugin-yet-another-subagent/tool-factory
  */
 
-import type { Context } from 'cordis'
+import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { AgentOptions } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
@@ -291,7 +291,8 @@ export function buildTool(profiles: readonly SubagentProfile[], ctx: Context) {
           const id = jobs.start({
             kind: 'subagent',
             label: args.description,
-            owner: parent,
+            // rc.1: `JobSpec.owner` is a durable SessionId, not the Agent.
+            owner: parent.id,
             run: () => {
               const controller = new AbortController()
               const start = ctx.subagents.start('spawn', { ...request, signal: controller.signal })

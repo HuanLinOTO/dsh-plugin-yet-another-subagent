@@ -4,11 +4,13 @@
  * Single bundle, dual entry: this is the client half (exports `./client`).
  * Host half ships via `.` (see `src/index.ts`).
  *
- * Two registrations:
- *   1. `settings.section` slot — the profile editor page (SettingsPage).
+ * Three registrations:
+ *   1. `plugins.row.config` keyed slot — the profile editor page on the
+ *      Plugins page, keyed `@huanlin/dsh-plugin-yet-another-subagent#ya-subagent`.
  *   2. `tool.call.toolview` keyed slot, key `subagent` — the live toolcall
  *      card (SubagentCard). A single key covers all profiles because the
  *      tool name is always `subagent`; the profile is a call parameter.
+ *   3. `conversation.view` list slot — the session's subagent tree tab.
  *
  * @module @huanlin/dsh-plugin-yet-another-subagent/client
  */
@@ -18,16 +20,24 @@ import type { ConnectionHandle, RpcResult } from '@deepseek-ai/dsh-client-connec
 // Type-only: pulls the client connection Context merge (ctx.connection).
 import type {} from '@deepseek-ai/dsh-client-connection/client'
 // Type-only: pulls the sessions object layer's Context merge (ctx.sessions).
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 // Type-only: pulls the renderer's Context merge (ctx.slots).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-// Type-only: pulls the shell's SlotMap merges (settings.section, tool.call.toolview).
+// Type-only: pulls the shell's SlotMap merges (plugins.row.config, tool.call.toolview).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-tool/client'
-// Type-only: pulls the 'conversation.view' SlotMap row for the tree tab registration.
+// Type-only: pulls the 'conversation.view' SlotMap row for the tree tab.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+// Type-only: pulls the Plugins page's 'plugins.row.config' SlotMap row.
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
+// Type-only: pulls the `ctx.uiWorkspace` Context merge (session navigation).
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+// Type-only: pulls the ui-session standard-props merge (sessionId/useSessions/useProjection).
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SubagentProfile } from '../types.ts'
 import type { ProfileListResponse } from '../rpc.ts'
 import { SubagentCard, type SubagentCardInjected } from './SubagentCard.tsx'
@@ -43,8 +53,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-/** Required services: settings/tool slots, locale, sessions, connection. */
-export const inject = ['slots', 'locale', 'sessions', 'connection']
+/** Required services: settings/tool slots, locale, sessions, connection, workspace navigation. */
+export const inject = ['slots', 'locale', 'sessions', 'connection', 'uiWorkspace']
 
 /** Profile list wire shape (mirror of host `ProfileListResponse`). */
 type ProfileListResult = RpcResult<ProfileListResponse>
@@ -57,7 +67,7 @@ interface ModelCatalogData {
 type ModelCatalogResult = RpcResult<ModelCatalogData>
 
 /**
- * Client plugin body: register settings page + single `subagent` toolview slot.
+ * Client plugin body: register the profile editor + the `subagent` toolview.
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
@@ -92,13 +102,19 @@ export function apply(ctx: ClientContext): void {
   // `ctx.connection` is typed as HostConnectionHandle (host-side merge) when
   // the host connection package is also in the type graph; in a real client
   // build only the client merge is present and the cast is a no-op.
+  // Both `@deepseek-ai/dsh-session` (Host) and
+  // `@deepseek-ai/dsh-api-session-controller/client` declare `ctx.sessions`; a
+  // single-face tsconfig that compiles BOTH halves resolves the Host
+  // `SessionStore` first. The client half only ever runs with the client
+  // augmentation, so narrow the face here (same pattern as `ctx.connection`).
+  const sessions = ctx.sessions as unknown as ISessions
   const connection = ctx.connection as unknown as ConnectionHandle
   const t = ctx.locale.bind(NS) as (key: string) => string
 
-  // ---- Profile label lookup for SubagentCard ---------------------------
-  // The card needs to resolve a profile id (from the tool call arguments)
-  // to its display label. We keep a local id→label map, refreshed whenever
-  // the profile list changes (settings mutation, connection reset).
+  // ---- Profile label lookup for the tool card / tree view ---------------
+  // Both resolve a profile id (from the tool call arguments) to its display
+  // label. We keep a local id→label map, refreshed whenever the profile list
+  // changes (settings mutation, connection reset).
   const profileLabels = new Map<string, string>()
   const refreshProfileLabels = (profiles: readonly SubagentProfile[]): void => {
     profileLabels.clear()
@@ -119,7 +135,7 @@ export function apply(ctx: ClientContext): void {
     })
   })
 
-  // ---- Model catalog fetch for SettingsPage -----------------------------
+  // ---- Model catalog fetch for the profile editor -----------------------
   // The generated session Remote serves `session/modelCatalog` on the shared
   // `/api` channel (endpoint = namespace/method); the plugin reads it through
   // the generic RPC caller instead of taking a dependency on the generated
@@ -137,13 +153,30 @@ export function apply(ctx: ClientContext): void {
     return result.value
   }
 
+  // ---- Shared navigation/invalidation actions ---------------------------
+  // rc.1 moved Session navigation to the ui-workspace navigation service and
+  // replaced the per-child catalog refresh with `refreshProjections`.
+  const openChild = (childId: SessionId): void => {
+    const address = sessions.subagentAddress(childId)
+    try {
+      ctx.uiWorkspace.openSession(address ?? childId)
+    } catch (error) {
+      ctx.logger.error('ya-subagent: openSession failed', error)
+    }
+  }
+  const refreshProjection = (sessionId: SessionId): void => {
+    void sessions.refreshProjections(sessionId)
+  }
+  const profileLabelOf = (id: string): string | undefined => profileLabels.get(id)
+
   // ---- Single toolview slot (key: 'subagent') ---------------------------
   // The tool name is always `subagent`; the profile is a call parameter.
   // SubagentCard reads profileLabel from the result content (continuable
   // branch) or falls back to the id→label map (foreground branch).
   const cardInjected = (): SubagentCardInjected => ({
-    sessions: ctx.sessions as unknown as SubagentCardInjected['sessions'],
-    profileLabelOf: (id: string) => profileLabels.get(id),
+    profileLabelOf,
+    openChild,
+    refreshProjection,
   })
   // Registered through slots.inject: the slot is declared by the ui-tool
   // `conversation.chat.node` entry's children table, so a bare register
@@ -155,30 +188,33 @@ export function apply(ctx: ClientContext): void {
     inject: cardInjected,
   }, SubagentCard))
 
-  // ---- Profile list fetch for SettingsPage ------------------------------
-  const fetchProfiles = fetchProfilesInternal
-
-  // ---- Settings page registration ---------------------------------------
+  // ---- Profile editor (plugins.row.config) ------------------------------
+  // rc.1: a plugin's configuration page lives on the Plugins page, keyed by
+  // `<bundle package>#<row id>` (the bundle's patch declares row
+  // `ya-subagent`). The rc.2 `settings.section` tab is not used.
   const settingsInjected = (): YaSubagentSettingsInjected => ({
     rpc: connection.rpc,
-    fetchProfiles,
+    fetchProfiles: fetchProfilesInternal,
     fetchModelCatalog: fetchModelCatalogInternal,
     t,
   })
-  ctx.slots.inject('settings.section', () => ctx.slots.register({
-    name: 'settings.section',
-    id: 'ya-subagent',
-    order: 30,
-    label: () => t('nav'),
-    inject: settingsInjected,
-  }, SettingsPage))
+  ctx.slots.inject('plugins.row.config', function* () {
+    yield ctx.slots.register({
+      name: 'plugins.row.config',
+      key: '@huanlin/dsh-plugin-yet-another-subagent#ya-subagent',
+      locale: NS,
+      inject: settingsInjected,
+    }, SettingsPage)
+  })
 
   // ---- Subagent tree view tab (conversation.view) ----------------------
-  // A session-scope view listing the current session's subagent children
-  // with live progress. order: 20 places it after Trajectory (10).
+  // A session-scope view listing the current session's subagent tree with
+  // live progress. order: 20 places it after Trajectory (10).
   const treeInjected = (): SubagentTreeViewInjected => ({
-    sessions: ctx.sessions as unknown as SubagentTreeViewInjected['sessions'],
-    profileLabelOf: (id: string) => profileLabels.get(id),
+    profileLabelOf,
+    openChild,
+    refreshProjection,
+    subagentAddress: (id: SessionId) => sessions.subagentAddress(id),
   })
   ctx.slots.inject('conversation.view', () => ctx.slots.register({
     name: 'conversation.view',

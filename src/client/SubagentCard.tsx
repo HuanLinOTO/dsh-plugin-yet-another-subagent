@@ -1,44 +1,35 @@
 /**
  * SubagentCard — the model-facing toolcall card for the `subagent` tool.
  *
- * Three display branches:
- *   1. **Running** (block is `RunningToolCall`): the tool call is in flight.
- *      Show "running" with a spinner dot; no child session to subscribe to.
- *   2. **Continuable settled** (result text matches `started <label>
- *      subagent <id>`): subscribe to the child's `yaSubagentProgress`
- *      projection for live toolcall/token counts; clickable to open.
- *   3. **Foreground settled** (result text is the child's output): the
- *      one-shot child has completed; show "completed" with an output
- *      preview. No child session survives.
+ * dsh 0.1.7-rc.1 (`DSH-0.1.7-RC1-23`) split the toolview owner props into an
+ * explicit `phase` union: `'preparing'` (no dispatched arguments),
+ * `'start'` (arguments available), and `'result'` (settled). This card renders
+ * a lightweight argument-free row while preparing, then branches on the
+ * durable result content:
+ *   1. **Running** (`phase: 'start'`): the call is dispatched and in flight.
+ *   2. **Continuable settled** (text `started <label> subagent <id>`): live
+ *      child progress from the `yaSubagentProgress` projection; clickable.
+ *   3. **Foreground settled** (text is the child's output): completed with an
+ *      output preview.
  *
  * @module @huanlin/dsh-plugin-yet-another-subagent/client/SubagentCard
  */
 
-import { useEffect, useState } from 'react'
-import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
+import { useEffect } from 'react'
+import type { ToolCallViewProps, StartedToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { YaSubagentProgressProjection, SubagentProfileProjection } from '../projection.ts'
 import css from './SubagentCard.module.css'
 
-/** Sessions service shape consumed by this card (narrow face of ISessions). */
-export interface SubagentCardSessions {
-  binding(id: string): {
-    session: {
-      projections: {
-        /** Absence of a value is an `undefined` snapshot, never a missing face. */
-        faceOf(key: string): { getSnapshot(): unknown; subscribe(fn: () => void): () => void }
-      }
-    }
-  } | undefined
-  openSubagent(address: { parentSessionId: string; childSessionId: string; mode: 'continuable' | 'one-shot' }): void
-  subagentAddress(id: string): { parentSessionId: string; childSessionId: string; mode: 'continuable' | 'one-shot' } | undefined
-  refreshSubagents(parentSessionId: string): Promise<void>
-}
-/** Inject face: the sessions service handle + profile label lookup. */
+/** Inject face: profile label lookup plus session navigation/invalidation actions. */
 export type SubagentCardInjected = {
-  sessions: SubagentCardSessions
   /** Resolve a profile id to its display label; undefined if unknown. */
   profileLabelOf: (id: string) => string | undefined
+  /** Open a child session's conversation. */
+  openChild: (childId: SessionId) => void
+  /** Re-read a session's projections from the host. */
+  refreshProjection: (sessionId: SessionId) => void
 }
 
 /** Full props: toolview runtime share + this package's locale seat + inject. */
@@ -54,21 +45,24 @@ interface ResultView {
   readonly output?: string
 }
 
-/** Parse `block.content` for:
+/** The settled result node's content, without a phase discriminant. */
+type SettledBlock = StartedToolCallViewProps['block']
+
+/**
+ * Parse a settled block's content for:
  *   - background:  `started background subagent task <taskId>`
  *   - continuable: `started <profileLabel> subagent <subagentId>`
  *   - foreground:  `completed <profileLabel> subagent <runId>\n<output>`
  *   - foreground (legacy): plain output text (no embedded id, not clickable)
  */
-function parseResult(block: ToolCallViewProps['block']): ResultView {
-  if (!('kind' in block)) return {} // running; no result yet
+function parseResult(block: SettledBlock): ResultView {
+  if (!('kind' in block)) return {} // start phase; no result yet
   const texts: string[] = []
   for (const item of block.content) {
     if (item.type !== 'text') continue
     // Background (one-shot task): `started background subagent task <taskId>`
     // The taskId is not the child session id; the child id comes from the
-    // ya-subagent/started projection event. Return empty so the card relies
-    // on the projection for childId resolution.
+    // subagentProfile projection. Return empty so the card relies on it.
     if (item.text.match(/^started background subagent task \S+$/) !== null) {
       return {}
     }
@@ -89,8 +83,8 @@ function parseResult(block: ToolCallViewProps['block']): ResultView {
   return output !== '' ? { output } : {}
 }
 
-/** Extract the `profile` parameter from a running or settled block's raw arguments. */
-function readProfileArg(block: ToolCallViewProps['block']): string | undefined {
+/** Extract the `profile` parameter from a settled block's raw arguments. */
+function readProfileArg(block: SettledBlock): string | undefined {
   const argsRaw = 'argsRaw' in block ? block.argsRaw : block.call?.argsRaw
   if (argsRaw === undefined) return undefined
   try {
@@ -115,74 +109,61 @@ function formatTokens(tokens: YaSubagentProgressProjection['tokens'] | undefined
   return `${display} ${t('card.tokens')}`
 }
 
-/**
- * Subscribe to a child session's `yaSubagentProgress` projection through the
- * sessions binding face. Returns `undefined` while the binding is absent or
- * the projection has not pushed yet.
- */
-function useChildProgress(
-  sessions: SubagentCardSessions,
-  childId: string | undefined,
-): YaSubagentProgressProjection | undefined {
-  const [progress, setProgress] = useState<YaSubagentProgressProjection | undefined>(undefined)
-  useEffect(() => {
-    if (childId === undefined) return
-    const binding = sessions.binding(childId)
-    if (binding === undefined) return
-    const face = binding.session.projections.faceOf('yaSubagentProgress')
-    const snapshot = face.getSnapshot() as YaSubagentProgressProjection | undefined
-    setProgress(snapshot ?? undefined)
-    return face.subscribe(() => {
-      const next = face.getSnapshot() as YaSubagentProgressProjection | undefined
-      setProgress(next ?? undefined)
-    })
-  }, [sessions, childId])
-  return progress
-}
-
-/**
- * Subscribe to the parent session's `subagentProfile` projection to resolve
- * a running call's childId (before the result text embeds it). Returns the
- * childId for this callId, or undefined.
- */
-function useChildIdFromProjection(
-  sessions: SubagentCardSessions,
-  sessionId: string,
-  callId: string,
-): string | undefined {
-  const [childId, setChildId] = useState<string | undefined>(undefined)
-  useEffect(() => {
-    const binding = sessions.binding(sessionId)
-    if (binding === undefined) return
-    const face = binding.session.projections.faceOf('subagentProfile')
-    const read = (): string | undefined => {
-      const snap = face.getSnapshot() as SubagentProfileProjection | undefined
-      return snap?.calls?.[callId]
-    }
-    setChildId(read())
-    return face.subscribe(() => setChildId(read()))
-  }, [sessions, sessionId, callId])
-  return childId
-}
-
-type CardState = 'running' | 'completed' | 'child-running' | 'child-idle'
+type CardState = 'preparing' | 'running' | 'completed' | 'child-running' | 'child-idle'
 
 /**
  * Render one `subagent` tool call as a compact live card.
- * @param props - keyed toolview payload + locale seat + sessions inject.
+ * @param props - keyed toolview payload + locale seat + navigation inject.
  * @returns the dedicated subagent card.
  */
-export function SubagentCard({ block, callId, toolName, sessionId, sessions, profileLabelOf, t }: SubagentCardProps) {
+export function SubagentCard(props: SubagentCardProps) {
+  if (props.phase === 'preparing') return <PreparingRow toolName={props.toolName} t={props.t} />
+  return <SettledCard {...props} />
+}
+
+/** Argument-free row shown while the call's arguments are still streaming. */
+function PreparingRow({ toolName, t }: { readonly toolName: string; readonly t: SubagentCardProps['t'] }) {
+  return (
+    <div className={css.card} data-tool={toolName} data-state="preparing">
+      <div className={css.header}>
+        <span className={css.stateDot} aria-hidden />
+        <span className={css.title}>{toolName}</span>
+        <span className={css.stateBadge}>{t('card.starting')}</span>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Start/result stages of one `subagent` call.
+ * @param props - start/result toolview payload + locale seat + navigation inject.
+ * @returns the live card.
+ */
+function SettledCard({ block, callId, toolName, profileLabelOf, openChild, refreshProjection, useSessions, useProjection, t }: StartedToolCallViewProps & PropsLocale<'ya-subagent'> & InjectFace<SubagentCardInjected>) {
   const result = parseResult(block)
-  const projectedChildId = useChildIdFromProjection(sessions, sessionId, callId)
-  const childId = result.subagentId ?? projectedChildId
+  // Parent-session projection: resolves a running call's childId before the
+  // result text embeds it.
+  const profileProjection = useProjection('subagentProfile') as SubagentProfileProjection | undefined
+  const projectedChildId = profileProjection?.calls?.[callId]
+  const childId = (result.subagentId ?? projectedChildId) as SessionId | undefined
   const profileId = readProfileArg(block)
   const profileLabel = result.profileLabel
     ?? (profileId !== undefined ? profileLabelOf(profileId) : undefined)
     ?? toolName
-  const progress = useChildProgress(sessions, childId)
 
-  // Derive display state.
+  // Child progress is read from the session list's per-session projection
+  // store (push frames land there whether or not the child is instantiated).
+  const progress = useSessions(
+    (state) => childId === undefined
+      ? undefined
+      : state.projectionsBySession[childId]?.values.yaSubagentProgress as YaSubagentProgressProjection | undefined,
+  )
+
+  // Load the child's projections once the child id is known.
+  useEffect(() => {
+    if (childId !== undefined) refreshProjection(childId)
+  }, [childId, refreshProjection])
+
   const isRunning = !('kind' in block)
   const isContinuable = childId !== undefined
   const liveState = progress?.state
@@ -196,42 +177,7 @@ export function SubagentCard({ block, callId, toolName, sessionId, sessions, pro
   const toolCallCount = progress?.toolCallCount ?? 0
   const clickable = childId !== undefined
 
-  const openChild = (): void => {
-    if (childId === undefined) return
-    const parentId = sessionId
-    // Try the retained address first (mode discovered at catalog time).
-    const retained = sessions.subagentAddress?.(childId)
-    if (retained !== undefined) {
-      try { sessions.openSubagent(retained); return } catch { /* fall through */ }
-    }
-    // Try both modes — the catalog entry's mode is authoritative, but we
-    // don't know it without inspecting the catalog. Try continuable first
-    // (the common case), then one-shot (foreground calls).
-    for (const mode of ['continuable', 'one-shot'] as const) {
-      try {
-        sessions.openSubagent({ parentSessionId: parentId, childSessionId: childId, mode })
-        return
-      } catch {
-        // try next mode
-      }
-    }
-    // Both modes failed; refresh the catalog and try once more.
-    void sessions.refreshSubagents(parentId).then(() => {
-      const r = sessions.subagentAddress?.(childId)
-      if (r !== undefined) {
-        try { sessions.openSubagent(r) }
-        catch (e) { console.error('[ya-subagent] openSubagent failed after refresh:', e) }
-      } else {
-        console.error('[ya-subagent] child not found in catalog after refresh:', childId)
-      }
-    }).catch((e: unknown) => {
-      console.error('[ya-subagent] refreshSubagents failed:', e)
-    })
-  }
-
   const stateLabel = t(`card.${cardState}`)
-  // For foreground completed calls, the result text starts with the session
-  // header line (`subagent <label> session <id>`); show the output body only.
   const showOutput = cardState === 'completed' && result.output !== undefined
 
   // Derive the latest activity line from the unified `activity` field.
@@ -250,7 +196,7 @@ export function SubagentCard({ block, callId, toolName, sessionId, sessions, pro
       data-tool={toolName}
       data-state={cardState}
       data-clickable={clickable || undefined}
-      onClick={clickable ? openChild : undefined}
+      onClick={clickable ? () => { if (childId !== undefined) openChild(childId) } : undefined}
       role={clickable ? 'button' : undefined}
       tabIndex={clickable ? 0 : undefined}
     >

@@ -28,7 +28,7 @@
  *
  * @module @huanlin/dsh-plugin-yet-another-subagent/rpc
  */
-import type { Context } from 'cordis';
+import type { Context } from '@deepseek-ai/cordis';
 import type { SubagentProfile } from './types.ts';
 import type { ProfileStore } from './profile-store.ts';
 import { type RepairStats } from './repair.ts';
@@ -65,5 +65,7 @@ export type YaSubagentValue = ProfileListResponse | ToolListResponse | RepairSta
  * the routes carry no authority options of their own.
  * @param ctx - host context.
  * @param store - profile store.
+ * @param onProfilesChanged - called after a successful profile mutation so the
+ *   caller re-registers the model-facing tool against the new list.
  */
-export declare function registerRpc(ctx: Context, store: ProfileStore): void;
+export declare function registerRpc(ctx: Context, store: ProfileStore, onProfilesChanged?: () => void): void;

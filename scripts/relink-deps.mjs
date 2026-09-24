@@ -16,6 +16,7 @@ const NODE_MODULES = resolve('node_modules')
 
 const LINKS = {
   'cordis': join(BUILT, 'vendor', 'cordis'),
+  '@deepseek-ai/cordis': join(BUILT, 'vendor', 'cordis'),
   '@deepseek-ai/schemastery': join(BUILT, 'vendor', 'schemastery'),
   '@deepseek-ai/dsh-agent': join(BUILT, 'packages', 'core', 'agent'),
   '@deepseek-ai/dsh-api-gateway': join(BUILT, 'packages', 'api', 'gateway'),

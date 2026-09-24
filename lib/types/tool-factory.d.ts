@@ -17,7 +17,7 @@
  *
  * @module @huanlin/dsh-plugin-yet-another-subagent/tool-factory
  */
-import type { Context } from 'cordis';
+import type { Context } from '@deepseek-ai/cordis';
 import type { SubagentProvider, SubagentResult, SubagentRun } from '@deepseek-ai/dsh-subagent';
 import type { JobOutcome } from '@deepseek-ai/dsh-jobs';
 import type { SubagentProfile } from './types.ts';

@@ -40,8 +40,8 @@ export interface YaSubagentSettingsInjected {
     /** Bound locale translator for the ya-subagent namespace. */
     readonly t: (key: string) => string;
 }
-/** Full props: settings.section runtime share + locale seat + inject. */
-type SettingsPageProps = PropsRuntime<'settings.section'> & PropsLocale<'ya-subagent'> & YaSubagentSettingsInjected;
+/** Full props: plugins.row.config runtime share + locale seat + inject. */
+type SettingsPageProps = PropsRuntime<'plugins.row.config'> & PropsLocale<'ya-subagent'> & YaSubagentSettingsInjected;
 /** One model inside a provider group (mirrors `ModelCatalogModel`). */
 interface ModelEntry {
     readonly id: string;
@@ -60,8 +60,8 @@ interface ModelCatalogData {
 }
 /**
  * Render the subagent profiles settings page.
- * @param props - settings.section runtime share + locale + inject.
- * @returns the page element.
+ * @param props - plugins.row.config runtime share + locale + inject.
+ * @returns the page element (summary one-liner for `view: 'summary'`).
  */
-export declare function SettingsPage({ rpc, fetchProfiles, fetchModelCatalog, t }: SettingsPageProps): import("react").JSX.Element;
+export declare function SettingsPage({ view, rpc, fetchProfiles, fetchModelCatalog, t }: SettingsPageProps): import("react").JSX.Element;
 export {};
