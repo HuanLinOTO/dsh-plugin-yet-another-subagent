@@ -191,7 +191,7 @@ export function apply(ctx: ClientContext): void {
   // ---- Profile editor (plugins.row.config) ------------------------------
   // rc.1: a plugin's configuration page lives on the Plugins page, keyed by
   // `<bundle package>#<row id>` (the bundle's patch declares row
-  // `ya-subagent`). The rc.2 `settings.section` tab is not used.
+  // `ya-subagent`); the rc.2 Settings-panel tab is deliberately not used.
   const settingsInjected = (): YaSubagentSettingsInjected => ({
     rpc: connection.rpc,
     fetchProfiles: fetchProfilesInternal,

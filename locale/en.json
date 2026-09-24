@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Yet Another Subagent",
+    "description": "Configurable subagent profiles with web UI settings, live toolcall/token progress, and click-to-navigate child sessions."
+  }
+}
