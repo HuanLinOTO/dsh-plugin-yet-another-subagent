@@ -11,8 +11,6 @@ function makeProfile(overrides: Partial<SubagentProfile> = {}): SubagentProfile 
     id: 'general',
     label: 'General',
     model: { kind: 'auto', provider: '', model: '' },
-    persona: { kind: 'inherit' },
-    toolFilter: { kind: 'none' },
     maxDepth: 3,
     backgroundMode: 'continuable',
     builtin: false,
@@ -186,6 +184,9 @@ describe('registerRpc exact Fetch routes', () => {
     await new Promise(resolve => setTimeout(resolve, 20))
     const connection = ctx.get('connection') as unknown as HostConnectionHandle
     const shared = connection.createSharedFetchHandler('/api')
+    // 0.2.1-alpha.5 (DSH-0.2.1-J1-16): the shared Fetch handler dispatches AS a
+    // Peer — required, never defaulted — and exact routes admit only the owner.
+    const peer = connection.createPeer({ principal: { kind: 'owner' } })
     const request = new Request('http://127.0.0.1:3080/api/ya-subagent.profiles.list', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -196,7 +197,7 @@ describe('registerRpc exact Fetch routes', () => {
         payload: {},
       }),
     })
-    const response = await shared.fetch(request)
+    const response = await shared.fetch(request, peer)
     expect(response.status).toBe(200)
     const body = await response.json() as {
       type: string

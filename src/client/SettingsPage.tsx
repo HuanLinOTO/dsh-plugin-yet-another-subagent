@@ -13,11 +13,9 @@
  * the bottom reveals an inline draft card with all fields editable (including
  * id) and Create / Cancel actions.
  *
- * The persona field is a radio (inherit deployment persona vs custom text);
- * the textarea is shown only when custom. The tool filter is a select
- * (none / allow / deny); a multi-select dropdown is shown only when allow or
- * deny is picked, populated from `tools.list` (the host's current
- * `ctx.tools.schemas()`).
+ * Persona and tool-filter editing were removed with dsh 0.2.1-alpha.5
+ * (DSH-0.2.1-J1-05): the subagent start request no longer carries `persona`
+ * (agent presets own it) or `toolFilter` (removed).
  *
  * Pulls the profile list once on mount via `connection.rpc.call('/api',
  * 'ya-subagent.profiles.list')`, dispatches add/update/remove through the
@@ -27,7 +25,7 @@
  * @module @huanlin/dsh-plugin-yet-another-subagent/client/SettingsPage
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ClientConnectionRpc, RpcResult } from '@deepseek-ai/dsh-client-connection/client'
@@ -36,7 +34,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { IconChevronDownOutlineMedium, Menu, Modal, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SubagentProfile } from '../types.ts'
-import type { ProfileListResponse, ToolListResponse } from '../rpc.ts'
+import type { ProfileListResponse } from '../rpc.ts'
 import css from './SettingsPage.module.css'
 
 /** Wire shape of `sessions.repair` (mirrors `RepairStats` on the host). */
@@ -63,13 +61,6 @@ export interface YaSubagentSettingsInjected {
 type SettingsPageProps = PropsRuntime<'plugins.row.config'> & PropsLocale<'ya-subagent'> & YaSubagentSettingsInjected
 
 type ProfileListResult = RpcResult<ProfileListResponse>
-type ToolListResult = RpcResult<ToolListResponse>
-
-/** A tool entry returned by `tools.list`. */
-interface ToolEntry {
-  readonly name: string
-  readonly description: string
-}
 
 /** One model inside a provider group (mirrors `ModelCatalogModel`). */
 interface ModelEntry {
@@ -96,8 +87,6 @@ function emptyDraft(): SubagentProfile {
     id: '',
     label: '',
     model: { kind: 'auto', provider: '', model: '' },
-    persona: { kind: 'inherit' },
-    toolFilter: { kind: 'none' },
     maxDepth: 3,
     backgroundMode: 'continuable',
     builtin: false,
@@ -125,7 +114,6 @@ export function SettingsPage({ view, rpc, fetchProfiles, fetchModelCatalog, t }:
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [addingNew, setAddingNew] = useState(false)
   const [newDraft, setNewDraft] = useState<SubagentProfile>(emptyDraft())
-  const [toolList, setToolList] = useState<readonly ToolEntry[]>([])
   const [modelGroups, setModelGroups] = useState<readonly ModelGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | undefined>(undefined)
@@ -139,15 +127,12 @@ export function SettingsPage({ view, rpc, fetchProfiles, fetchModelCatalog, t }:
     setLoading(true)
     setError(undefined)
     try {
-      const [list, toolsResult, catalog] = await Promise.all([
+      const [list, catalog] = await Promise.all([
         fetchProfiles(),
-        callRpc<ToolListResult>(rpc, 'tools.list', {}),
         fetchModelCatalog().catch(() => undefined),
       ])
       setProfiles(list)
       setDrafts(list.map(p => ({ ...p })))
-      if (toolsResult.ok) setToolList(toolsResult.value.tools)
-      else setToolList([])
       if (catalog !== undefined) setModelGroups(catalog.groups)
       else setModelGroups([])
     } catch (err) {
@@ -155,7 +140,7 @@ export function SettingsPage({ view, rpc, fetchProfiles, fetchModelCatalog, t }:
     } finally {
       setLoading(false)
     }
-  }, [fetchProfiles, fetchModelCatalog, rpc])
+  }, [fetchProfiles, fetchModelCatalog])
 
   useEffect(() => { void refresh() }, [refresh])
 
@@ -254,7 +239,6 @@ export function SettingsPage({ view, rpc, fetchProfiles, fetchModelCatalog, t }:
               key={draft.id}
               draft={draft}
               expanded={expanded.has(draft.id)}
-              toolList={toolList}
               modelGroups={modelGroups}
               t={t}
               onToggle={() => toggleExpand(draft.id)}
@@ -269,7 +253,6 @@ export function SettingsPage({ view, rpc, fetchProfiles, fetchModelCatalog, t }:
               draft={newDraft}
               expanded={true}
               isNew={true}
-              toolList={toolList}
               modelGroups={modelGroups}
               t={t}
               onPatch={patch => setNewDraft(prev => ({ ...prev, ...patch }))}
@@ -387,7 +370,6 @@ interface ProfileCardProps {
   readonly draft: SubagentProfile
   readonly expanded: boolean
   readonly isNew?: boolean
-  readonly toolList: readonly ToolEntry[]
   readonly modelGroups: readonly ModelGroup[]
   readonly t: (key: string) => string
   readonly onToggle?: () => void
@@ -398,7 +380,7 @@ interface ProfileCardProps {
   readonly onCancel?: () => void
 }
 
-function ProfileCard({ draft, expanded, isNew, toolList, modelGroups, t, onToggle, onPatch, onSave, onDelete, onCreate, onCancel }: ProfileCardProps) {
+function ProfileCard({ draft, expanded, isNew, modelGroups, t, onToggle, onPatch, onSave, onDelete, onCreate, onCancel }: ProfileCardProps) {
   return (
     <li className={css.rowCard}>
       <div className={css.rowHead}>
@@ -524,82 +506,6 @@ function ProfileCard({ draft, expanded, isNew, toolList, modelGroups, t, onToggl
               </div>
             </>
           )}
-          <div className={css.field}>
-            <span className={css.fieldLabel}>{t('row.persona')}</span>
-            <div className={css.radioGroup}>
-              <label className={css.radioOption}>
-                <input
-                  type="radio"
-                  name={`persona-${draft.id}-${isNew ? 'new' : ''}`}
-                  checked={draft.persona.kind === 'inherit'}
-                  onChange={() => onPatch({ persona: { kind: 'inherit' } })}
-                />
-                {t('row.persona.kind.inherit')}
-              </label>
-              <label className={css.radioOption}>
-                <input
-                  type="radio"
-                  name={`persona-${draft.id}-${isNew ? 'new' : ''}`}
-                  checked={draft.persona.kind === 'custom'}
-                  onChange={() => onPatch({ persona: { kind: 'custom', text: draft.persona.kind === 'custom' ? draft.persona.text : '' } })}
-                />
-                {t('row.persona.kind.custom')}
-              </label>
-            </div>
-          </div>
-          {draft.persona.kind === 'custom' && (
-            <label className={css.field}>
-              <span className={css.fieldLabel}>{t('row.persona.text')}</span>
-              <textarea
-                className={css.textarea}
-                value={draft.persona.kind === 'custom' ? draft.persona.text : ''}
-                onChange={e => onPatch({ persona: { kind: 'custom', text: e.target.value } })}
-              />
-            </label>
-          )}
-          <div className={css.field}>
-            <span className={css.fieldLabel}>{t('row.toolFilter')}</span>
-            <div className={css.radioGroup}>
-              <label className={css.radioOption}>
-                <input
-                  type="radio"
-                  name={`toolFilter-${draft.id}-${isNew ? 'new' : ''}`}
-                  checked={draft.toolFilter.kind === 'none'}
-                  onChange={() => onPatch({ toolFilter: { kind: 'none' } })}
-                />
-                {t('row.toolFilter.kind.none')}
-              </label>
-              <label className={css.radioOption}>
-                <input
-                  type="radio"
-                  name={`toolFilter-${draft.id}-${isNew ? 'new' : ''}`}
-                  checked={draft.toolFilter.kind === 'allow'}
-                  onChange={() => onPatch({ toolFilter: { kind: 'allow', tools: draft.toolFilter.kind === 'allow' ? draft.toolFilter.tools : [] } })}
-                />
-                {t('row.toolFilter.kind.allow')}
-              </label>
-              <label className={css.radioOption}>
-                <input
-                  type="radio"
-                  name={`toolFilter-${draft.id}-${isNew ? 'new' : ''}`}
-                  checked={draft.toolFilter.kind === 'deny'}
-                  onChange={() => onPatch({ toolFilter: { kind: 'deny', tools: draft.toolFilter.kind === 'deny' ? draft.toolFilter.tools : [] } })}
-                />
-                {t('row.toolFilter.kind.deny')}
-              </label>
-            </div>
-          </div>
-          {(draft.toolFilter.kind === 'allow' || draft.toolFilter.kind === 'deny') && (
-            <label className={css.field}>
-              <span className={css.fieldLabel}>{t('row.toolFilter.tools')}</span>
-              <MultiSelect
-                options={toolList}
-                value={draft.toolFilter.kind === 'allow' || draft.toolFilter.kind === 'deny' ? [...draft.toolFilter.tools] : []}
-                onChange={next => onPatch({ toolFilter: { kind: draft.toolFilter.kind === 'deny' ? 'deny' : 'allow', tools: next } })}
-                t={t}
-              />
-            </label>
-          )}
           <label className={css.field}>
             <span className={css.fieldLabel}>{t('row.maxDepth')}</span>
             <input
@@ -613,101 +519,6 @@ function ProfileCard({ draft, expanded, isNew, toolList, modelGroups, t, onToggl
         </div>
       )}
     </li>
-  )
-}
-
-// ─── MultiSelect ─────────────────────────────────────────────────────────────
-
-interface MultiSelectProps {
-  readonly options: readonly ToolEntry[]
-  readonly value: readonly string[]
-  readonly onChange: (next: string[]) => void
-  readonly t: (key: string) => string
-}
-
-function MultiSelect({ options, value, onChange, t }: MultiSelectProps) {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent): void => {
-      if (containerRef.current !== null && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
-  const q = query.trim().toLowerCase()
-  const filtered = q === '' ? options : options.filter(o => o.name.toLowerCase().includes(q))
-  const valueSet = new Set(value)
-  const filteredAllSelected = filtered.length > 0 && filtered.every(o => valueSet.has(o.name))
-
-  const selectAllFiltered = (): void => {
-    if (filteredAllSelected) {
-      // Deselect all filtered entries.
-      const next = value.filter(n => !filtered.some(o => o.name === n))
-      onChange(next)
-    } else {
-      // Add all filtered entries (union with existing).
-      const next = new Set(value)
-      for (const o of filtered) next.add(o.name)
-      onChange([...next])
-    }
-  }
-
-  const toggleOne = (name: string): void => {
-    if (valueSet.has(name)) onChange(value.filter(n => n !== name))
-    else onChange([...value, name])
-  }
-
-  const label = value.length === 0
-    ? t('row.toolFilter.tools')
-    : t('row.toolFilter.tools.selected').replace('{n}', String(value.length))
-
-  return (
-    <div className={css.multiSelect} ref={containerRef}>
-      <button type="button" className={css.msButton} onClick={() => setOpen(prev => !prev)}>
-        <span className={css.msButtonLabel}>{label}</span>
-        <IconChevronDownOutlineMedium className={css.msCaret} />
-      </button>
-      {open && (
-        <div className={css.msPopup}>
-          <input
-            className={css.msSearch}
-            placeholder={t('row.toolFilter.tools.search')}
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-          />
-          <div className={css.msActions}>
-            <button type="button" className={css.msActionLink} onClick={selectAllFiltered}>
-              {filteredAllSelected ? t('row.toolFilter.tools.clear') : t('row.toolFilter.tools.selectAll')}
-            </button>
-          </div>
-          <ul className={css.msList}>
-            {filtered.length === 0 ? (
-              <li className={css.msEmpty}>{t('row.toolFilter.tools.empty')}</li>
-            ) : (
-              filtered.map(o => (
-                <li key={o.name} className={css.msItem}>
-                  <label className={css.msItemLabel} title={o.description}>
-                    <input
-                      type="checkbox"
-                      checked={valueSet.has(o.name)}
-                      onChange={() => toggleOne(o.name)}
-                    />
-                    <span className={css.msItemName}>{o.name}</span>
-                  </label>
-                </li>
-              ))
-            )}
-          </ul>
-        </div>
-      )}
-    </div>
   )
 }
 

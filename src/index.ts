@@ -8,7 +8,10 @@
  *   - A single `subagent` tool is exposed to the model. The desired profile
  *     is selected via the `profile` parameter (enum of profile ids). Profile
  *     add/remove updates the enum without changing the tool name set.
- *   - The tool reuses the official `spawn` provider via `ctx.subagents.startContinuable`.
+ *   - The tool reuses the official `spawn` provider via
+ *     `ctx.subagents.startActivation` (dsh 0.2.1-alpha.5: one call shape for
+ *     foreground, continuable, and job paths; `delivery` selects the result
+ *     recipient).
  *   - Profiles live in a `ProfileStore` whose list is the entry's volatile
  *     Cordis `Config` (`profiles`); runtime mutations commit through the
  *     settings service and persist to the active profile's `cordis.patch.yml`

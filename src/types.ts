@@ -22,23 +22,8 @@ export interface SubagentProfile {
     readonly model: string
   }
   /**
-   * Persona selection. `kind: 'inherit'` omits the per-child persona so the
-   * child uses the deployment `system-prompt` persona (same as the official
-   * `tool-subagent` default when no `persona` is configured). `kind: 'custom'`
-   * shadows the deployment persona with the provided text.
+   * Maximum delegation depth (non-negative safe integer); default 1.
    */
-  readonly persona: { readonly kind: 'inherit' } | { readonly kind: 'custom'; readonly text: string }
-  /**
-   * Tool filter selection. `kind: 'none'` applies no filter (child sees every
-   * visible global tool). `kind: 'allow'` keeps only the named tools;
-   * `kind: 'deny'` removes the named tools. The chosen tools are only sent to
-   * the provider when `kind` is not `'none'`.
-   */
-  readonly toolFilter:
-    | { readonly kind: 'none' }
-    | { readonly kind: 'allow'; readonly tools: readonly string[] }
-    | { readonly kind: 'deny'; readonly tools: readonly string[] }
-  /** Maximum delegation depth (non-negative safe integer); default 3. */
   readonly maxDepth: number
   /**
    * Background policy when `run_in_background: true` is set. `'continuable'`
@@ -67,25 +52,19 @@ export interface YaSubagentConfig {
 }
 
 /**
- * Coerce a possibly-stale profile shape (from an older `settings.yaml` or a
- * caller that still uses the legacy `persona?: string` / `toolFilter?: { allow?, deny? }`
- * form) into the current {@link SubagentProfile} shape. Idempotent on already-
- * current shapes.
+ * Coerce a possibly-stale profile shape into the current
+ * {@link SubagentProfile} shape. Idempotent on already-current shapes.
+ *
+ * Since dsh 0.2.1-alpha.5 the subagent start request no longer carries
+ * `persona` or `toolFilter` (DSH-0.2.1-J1-05), so those profile fields were
+ * removed. A stored profile that still carries them migrates by dropping the
+ * fields — personas now come from agent presets and tool filters are gone.
  *
  * Rules:
- *   - `persona: undefined | '' | null` → `{ kind: 'inherit' }`
- *   - `persona: string` (non-empty) → `{ kind: 'custom', text }`
- *   - `persona: { kind: 'inherit' }` → as-is
- *   - `persona: { kind: 'custom', text }` → as-is (text trimmed; empty → inherit)
- *   - `toolFilter: undefined | null` → `{ kind: 'none' }`
- *   - `toolFilter: { allow: [...], deny: [...] }` → allow wins if non-empty, else deny, else none
- *   - `toolFilter: { kind: 'none' | 'allow' | 'deny', tools? }` → as-is (tools defaulted to [])
  *   - `builtin: undefined | null` → `false`
  */
 export function migrateProfile(input: unknown): SubagentProfile {
   const p = input as Partial<SubagentProfile> & {
-    persona?: unknown
-    toolFilter?: unknown
     builtin?: unknown
   }
   if (typeof p !== 'object' || p === null) {
@@ -109,82 +88,16 @@ export function migrateProfile(input: unknown): SubagentProfile {
       provider: typeof p.model.provider === 'string' ? p.model.provider : '',
       model: typeof p.model.model === 'string' ? p.model.model : '',
     },
-    persona: migratePersona(p.persona),
-    toolFilter: migrateToolFilter(p.toolFilter),
     maxDepth: p.maxDepth,
     backgroundMode: p.backgroundMode === 'one-shot' ? 'one-shot' : 'continuable',
     builtin: p.builtin === true,
   }
 }
 
-function migratePersona(raw: unknown): SubagentProfile['persona'] {
-  if (raw === undefined || raw === null) return { kind: 'inherit' }
-  if (typeof raw === 'string') {
-    return raw.trim() === '' ? { kind: 'inherit' } : { kind: 'custom', text: raw }
-  }
-  if (typeof raw === 'object' && raw !== null && typeof (raw as { kind?: unknown }).kind === 'string') {
-    const k = (raw as { kind: string }).kind
-    if (k === 'inherit') return { kind: 'inherit' }
-    if (k === 'custom') {
-      const text = typeof (raw as { text?: unknown }).text === 'string'
-        ? (raw as { text: string }).text
-        : ''
-      return text.trim() === '' ? { kind: 'inherit' } : { kind: 'custom', text }
-    }
-  }
-  return { kind: 'inherit' }
-}
-
-function migrateToolFilter(raw: unknown): SubagentProfile['toolFilter'] {
-  if (raw === undefined || raw === null) return { kind: 'none' }
-  if (typeof raw !== 'object') return { kind: 'none' }
-  const obj = raw as { kind?: unknown; allow?: unknown; deny?: unknown; tools?: unknown }
-  if (typeof obj.kind === 'string') {
-    if (obj.kind === 'none') return { kind: 'none' }
-    if (obj.kind === 'allow' || obj.kind === 'deny') {
-      const tools = Array.isArray(obj.tools)
-        ? obj.tools.filter((t): t is string => typeof t === 'string')
-        : []
-      return { kind: obj.kind, tools }
-    }
-  }
-  // Legacy { allow?, deny? } form.
-  const allow = Array.isArray(obj.allow) ? obj.allow.filter((t): t is string => typeof t === 'string') : []
-  const deny = Array.isArray(obj.deny) ? obj.deny.filter((t): t is string => typeof t === 'string') : []
-  if (allow.length > 0) return { kind: 'allow', tools: allow }
-  if (deny.length > 0) return { kind: 'deny', tools: deny }
-  return { kind: 'none' }
-}
-
 /** Derive agentOptions from a profile's model selection. */
 export function agentOptionsFor(profile: SubagentProfile): { readonly agentOptions?: AgentOptions } {
   if (profile.model.kind === 'auto') return {}
   return { agentOptions: { provider: profile.model.provider, model: profile.model.model } }
-}
-
-/**
- * Project the persona field onto the request shape: `undefined` for `inherit`
- * (omit the field so the child uses the deployment persona) and the text for
- * `custom`.
- */
-export function personaForRequest(profile: SubagentProfile): { readonly persona?: string } {
-  return profile.persona.kind === 'custom' ? { persona: profile.persona.text } : {}
-}
-
-/**
- * Project the toolFilter field onto the request shape: `undefined` for `none`
- * (omit the field so the child sees every visible tool) and the allow/deny
- * pair for `allow`/`deny`.
- */
-export function toolFilterForRequest(profile: SubagentProfile): { readonly toolFilter?: { readonly allow?: readonly string[]; readonly deny?: readonly string[] } } {
-  switch (profile.toolFilter.kind) {
-    case 'none':
-      return {}
-    case 'allow':
-      return { toolFilter: { allow: profile.toolFilter.tools } }
-    case 'deny':
-      return { toolFilter: { deny: profile.toolFilter.tools } }
-  }
 }
 
 /** Validate a profile id: lowercase letters, digits, hyphens; 1–32 chars. */

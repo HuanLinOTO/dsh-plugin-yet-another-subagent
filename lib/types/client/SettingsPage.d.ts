@@ -13,11 +13,9 @@
  * the bottom reveals an inline draft card with all fields editable (including
  * id) and Create / Cancel actions.
  *
- * The persona field is a radio (inherit deployment persona vs custom text);
- * the textarea is shown only when custom. The tool filter is a select
- * (none / allow / deny); a multi-select dropdown is shown only when allow or
- * deny is picked, populated from `tools.list` (the host's current
- * `ctx.tools.schemas()`).
+ * Persona and tool-filter editing were removed with dsh 0.2.1-alpha.5
+ * (DSH-0.2.1-J1-05): the subagent start request no longer carries `persona`
+ * (agent presets own it) or `toolFilter` (removed).
  *
  * Pulls the profile list once on mount via `connection.rpc.call('/api',
  * 'ya-subagent.profiles.list')`, dispatches add/update/remove through the

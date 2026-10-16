@@ -42,8 +42,6 @@
           - id: general
             label: General
             model: { kind: 'auto' }
-            persona: { kind: 'inherit' }
-            toolFilter: { kind: 'none' }
             maxDepth: 3
             backgroundMode: continuable
             builtin: true
@@ -52,6 +50,8 @@
 
 ### Profile 字段
 
+> dsh `0.2.1-alpha.5` 起子代理启动请求不再携带 `persona` / `toolFilter`（人设由 Agent Preset 接管，工具过滤被移除），这两个字段已随之删除；已存配置中的旧值会在读取时被丢弃。
+
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `id` | `string`（小写字母/数字/连字符，1-32 字符） | — | Profile 唯一标识 |
@@ -59,10 +59,6 @@
 | `model.kind` | `'auto'` \| `'manual'` | — | `auto` 继承父代理模型；`manual` 指定 |
 | `model.provider` | `string` | `''` | Provider（仅 `manual` 时使用） |
 | `model.model` | `string` | `''` | 模型 ID（仅 `manual` 时使用） |
-| `persona.kind` | `'inherit'` \| `'custom'` | `'inherit'` | `inherit` 跟随部署人设；`custom` 自定义 |
-| `persona.text` | `string` | `''` | 自定义人设文本（仅 `custom` 时使用） |
-| `toolFilter.kind` | `'none'` \| `'allow'` \| `'deny'` | `'none'` | 工具过滤策略 |
-| `toolFilter.tools` | `string[]` | `[]` | 过滤工具列表 |
 | `maxDepth` | `number` | `3` | 最大递归深度 |
 | `backgroundMode` | `'continuable'` \| `'one-shot'` | `'continuable'` | `run_in_background: true` 时的后台策略 |
 | `builtin` | `boolean` | `false` | 是否为内置 profile（仅展示用） |

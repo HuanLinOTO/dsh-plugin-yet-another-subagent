@@ -8,8 +8,6 @@ function makeProfile(overrides: Partial<SubagentProfile> = {}): SubagentProfile 
     id: 'general',
     label: 'General',
     model: { kind: 'auto', provider: '', model: '' },
-    persona: { kind: 'inherit' },
-    toolFilter: { kind: 'none' },
     maxDepth: 1,
     backgroundMode: 'continuable',
     builtin: false,

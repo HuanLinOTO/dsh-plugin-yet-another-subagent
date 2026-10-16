@@ -8,8 +8,6 @@ function makeProfile(overrides: Partial<SubagentProfile> = {}): SubagentProfile 
     id: 'general',
     label: 'General',
     model: { kind: 'auto', provider: '', model: '' },
-    persona: { kind: 'inherit' },
-    toolFilter: { kind: 'none' },
     maxDepth: 3,
     backgroundMode: 'continuable',
     builtin: false,
@@ -199,7 +197,7 @@ describe('ProfileStore', () => {
   })
 
   describe('migrateProfile (legacy shape compatibility)', () => {
-    it('coerces legacy persona: string to { kind: "custom", text }', () => {
+    it('drops legacy persona/toolFilter fields (removed with dsh 0.2.1-alpha.5)', () => {
       const migrated = migrateProfile({
         id: 'p',
         label: 'P',
@@ -207,46 +205,24 @@ describe('ProfileStore', () => {
         persona: 'You are a reviewer.',
         toolFilter: { allow: ['bash'], deny: [] },
         maxDepth: 2,
-      })
-      expect(migrated.persona).toEqual({ kind: 'custom', text: 'You are a reviewer.' })
-      expect(migrated.toolFilter).toEqual({ kind: 'allow', tools: ['bash'] })
+      } as Record<string, unknown>)
+      expect('persona' in migrated).toBe(false)
+      expect('toolFilter' in migrated).toBe(false)
       expect(migrated.builtin).toBe(false)
+      expect(migrated.backgroundMode).toBe('continuable')
     })
 
-    it('coerces empty legacy persona to { kind: "inherit" }', () => {
+    it('keeps the remaining fields through migration', () => {
       const migrated = migrateProfile({
         id: 'p',
         label: 'P',
-        model: { kind: 'auto' },
-        persona: '',
-        toolFilter: undefined,
-        maxDepth: 0,
+        model: { kind: 'manual', provider: 'deepseek', model: 'chat' },
+        maxDepth: 2,
+        backgroundMode: 'one-shot',
       })
-      expect(migrated.persona).toEqual({ kind: 'inherit' })
-      expect(migrated.toolFilter).toEqual({ kind: 'none' })
-    })
-
-    it('coerces legacy toolFilter { deny: [...] } to { kind: "deny", tools }', () => {
-      const migrated = migrateProfile({
-        id: 'p',
-        label: 'P',
-        model: { kind: 'auto' },
-        persona: undefined,
-        toolFilter: { deny: ['bash', 'fs'] },
-        maxDepth: 1,
-      })
-      expect(migrated.toolFilter).toEqual({ kind: 'deny', tools: ['bash', 'fs'] })
-    })
-
-    it('coerces legacy toolFilter { allow: [], deny: [] } to { kind: "none" }', () => {
-      const migrated = migrateProfile({
-        id: 'p',
-        label: 'P',
-        model: { kind: 'auto' },
-        maxDepth: 1,
-      })
-      expect(migrated.toolFilter).toEqual({ kind: 'none' })
-      expect(migrated.persona).toEqual({ kind: 'inherit' })
+      expect(migrated.model).toEqual({ kind: 'manual', provider: 'deepseek', model: 'chat' })
+      expect(migrated.maxDepth).toBe(2)
+      expect(migrated.backgroundMode).toBe('one-shot')
     })
 
     it('is idempotent on the new shape', () => {

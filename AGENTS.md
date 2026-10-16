@@ -4,7 +4,7 @@
 
 Bundle-style DSH plugin exposing configurable subagent profiles as model-facing `subagent_<id>` tools. Web UI settings, real-time toolcall/token display, click-to-navigate child sessions. Disables official `tool-subagent` and `tool-subagent-fork`.
 
-Target host: **dsh 0.1.7-rc.1** (`@deepseek-ai/cordis@4.0.4`, `@deepseek-ai/schemastery@3.18.4`).
+Target host: **dsh 0.2.1-alpha.5** (`@deepseek-ai/cordis@4.0.5-alpha.2`, `@deepseek-ai/schemastery@3.18.5-alpha.2`).
 
 ## Key conventions
 
@@ -13,7 +13,7 @@ Target host: **dsh 0.1.7-rc.1** (`@deepseek-ai/cordis@4.0.4`, `@deepseek-ai/sche
 - **Single bundle, dual entry**: `.` (host), `./client` (browser). No `./invariant` entry: since dsh 0.1.2-rc.1 the invariant rule forbids empty installers, and this plugin's registrations (tools/RPC/projections) have no independent divergent runtime observation.
 - **Persistence is the profile-owned Cordis `Config`** (dsh 0.1.7-rc.1 `DSH-0.1.7-RC1-04`): `ctx.settings.register` is gone. `src/config.ts` declares the entry `Config` with `profiles` marked `.volatile()`; `apply` receives a live `Volatile<SubagentProfile[]>` reference. `src/settings.ts` installs the presentation policy (`settings.configure({ auto: false })`) and returns a bridge (`source()` reads the live reference, `persist(list)` calls `settings.update('ya-subagent', { profiles })`). Values persist per profile in `cordis.patch.yml` under the entry id. Headless assemblies without a settings provider keep the composition seed in memory only.
 - **Entry row id = `ya-subagent`**: the row id doubles as the settings/profile entry id. It deliberately matches the legacy `$DSH_HOME/settings.yaml` namespace so the host's one-time import maps the existing profile section onto this entry instead of stranding it.
-- **Profile = tool instance**: each user-configured profile maps to a `subagent_<profile_id>` tool registered via `ctx.tools.register(defineTool(...))`. Reuses official `spawn` provider via `ctx.subagents.startContinuable`.
+- **Profile = tool instance**: each user-configured profile maps to a `subagent_<profile_id>` tool registered via `ctx.tools.register(defineTool(...))`. Reuses official `spawn` provider via `ctx.subagents.startActivation` (`delivery: 'caller'` foreground/job, `delivery: 'parent'` continuable; dsh 0.2.1-alpha.5 DSH-0.2.1-J1-05).
 - **`maxDepth` defaults to 1** (matches the host/`tool-subagent` default since 0.1.7-rc.1; profiles can opt into deeper nesting).
 - **ProfileLabel in result content**: tool execute embeds `profileLabel` in the continuable result content (`started <label> subagent <id>`), so SubagentCard reads it with zero RPC (SkillRow paradigm).
 - **Profile CRUD via exact Fetch routes on `/api`**: `ya-subagent.profiles.*`/`tools.list`/`sessions.repair` registered through `ctx.connection.fetch.register` (the host's dedicated `rpc.handle` channels cannot mount in the web profile — the webserver service is a sibling loader row, never an ancestor of the connection fiber). Business errors reuse the closed `internal` RpcError code with descriptive messages. A successful mutation calls back into `apply` to re-register the model-facing tool against the new list.

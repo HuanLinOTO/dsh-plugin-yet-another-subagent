@@ -25,20 +25,6 @@ export type YaSubagentKey =
   | 'row.model.provider.placeholder'
   | 'row.model.model.placeholder'
   | 'row.model.noModels'
-  | 'row.persona'
-  | 'row.persona.kind.inherit'
-  | 'row.persona.kind.custom'
-  | 'row.persona.text'
-  | 'row.toolFilter'
-  | 'row.toolFilter.kind.none'
-  | 'row.toolFilter.kind.allow'
-  | 'row.toolFilter.kind.deny'
-  | 'row.toolFilter.tools'
-  | 'row.toolFilter.tools.search'
-  | 'row.toolFilter.tools.empty'
-  | 'row.toolFilter.tools.selected'
-  | 'row.toolFilter.tools.selectAll'
-  | 'row.toolFilter.tools.clear'
   | 'row.maxDepth'
   | 'row.delete'
   | 'row.delete.confirm'
@@ -109,20 +95,6 @@ export const en: Record<YaSubagentKey, string> = {
   'row.model.provider.placeholder': 'Select provider…',
   'row.model.model.placeholder': 'Select model…',
   'row.model.noModels': 'No models available',
-  'row.persona': 'Persona',
-  'row.persona.kind.inherit': 'Inherit (default persona)',
-  'row.persona.kind.custom': 'Custom',
-  'row.persona.text': 'Custom persona text',
-  'row.toolFilter': 'Tools',
-  'row.toolFilter.kind.none': 'No restriction',
-  'row.toolFilter.kind.allow': 'Whitelist',
-  'row.toolFilter.kind.deny': 'Blacklist',
-  'row.toolFilter.tools': 'Tools',
-  'row.toolFilter.tools.search': 'Search tools…',
-  'row.toolFilter.tools.empty': 'No tools found',
-  'row.toolFilter.tools.selected': '{n} selected',
-  'row.toolFilter.tools.selectAll': 'Select all',
-  'row.toolFilter.tools.clear': 'Clear',
   'row.maxDepth': 'Max depth',
   'row.delete': 'Delete',
   'row.delete.confirm': 'Delete this profile?',
@@ -191,20 +163,6 @@ export const zh: Record<YaSubagentKey, string> = {
   'row.model.provider.placeholder': '选择 Provider…',
   'row.model.model.placeholder': '选择模型…',
   'row.model.noModels': '无可用模型',
-  'row.persona': '人设',
-  'row.persona.kind.inherit': '跟随默认人设',
-  'row.persona.kind.custom': '自定义',
-  'row.persona.text': '自定义人设文本',
-  'row.toolFilter': '工具',
-  'row.toolFilter.kind.none': '不管',
-  'row.toolFilter.kind.allow': '白名单',
-  'row.toolFilter.kind.deny': '黑名单',
-  'row.toolFilter.tools': '工具列表',
-  'row.toolFilter.tools.search': '搜索工具…',
-  'row.toolFilter.tools.empty': '未找到工具',
-  'row.toolFilter.tools.selected': '已选 {n} 个',
-  'row.toolFilter.tools.selectAll': '全选',
-  'row.toolFilter.tools.clear': '清空',
   'row.maxDepth': '最大递归深度',
   'row.delete': '删除',
   'row.delete.confirm': '确定删除此配置？',

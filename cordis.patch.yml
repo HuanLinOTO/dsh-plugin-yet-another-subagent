@@ -1,6 +1,6 @@
 # Disable official tool-subagent (spawn path; this plugin takes over the
 # `subagent` tool name). The fork path (`tool-subagent-fork`, tool name
-# `subagent_fork`) is left intact — no name collision with this plugin's
+# `subagent_fork`) is left intact - no name collision with this plugin's
 # single `subagent` tool, and fork delegation stays available to the model.
 - id: tool-subagent
   disabled: true
@@ -17,16 +17,14 @@
           - id: general
             label: General
             model: { kind: 'auto' }
-            persona: { kind: 'inherit' }
-            toolFilter: { kind: 'none' }
             maxDepth: 1
             builtin: true
         generalFixed: true
 
 # ----------------------------------------------------------------------------
-# rc.1 preset takeover suppress (dsh 0.1.7-rc.1, DSH-0.1.7-RC1 presets)
+# rc.1 preset takeover suppress (regenerated for dsh 0.2.1-alpha.5)
 #
-# rc.1 mounts the official `subagent` tool (delegation `tool-subagent`, spawn
+# dsh mounts the official `subagent` tool (delegation `tool-subagent`, spawn
 # provider) INSIDE the agent presets, and dsh-tool-subagent registers it into
 # EACH AGENT'S OWN scope (installScoped on agent/created). This plugin also
 # registers `subagent` per agent to shadow the official tool - two same-name
@@ -37,12 +35,17 @@
 # preset row's config object), so the only supported suppression is the keyed
 # whole-config override documented by agent-preset-registry ("an override of a
 # shipped one is ... a patch keyed by that row's id"): restate each shipped
-# preset minus the delegation `tool-subagent` row. Copied verbatim (incl.
-# `!!js` expressions, re-evaluated at every load) from
-# packages/bundle/web-app/presets/<name>.patch.yml of dsh 0.1.7-rc.1
-# (d1e22a7e24 feat(preset)). REVIEW ON EVERY DSH UPGRADE: if a preset changes
-# upstream, regenerate these blocks or the stale restatement silently wins.
-# `tool-subagent-fork` (`subagent_fork`) stays available by design.
+# preset minus the delegation `tool-subagent` (spawn) row. Copied verbatim
+# (incl. `!!js` expressions, re-evaluated at every load) from
+# packages/bundle/web-app/presets/<name>.patch.yml of dsh 0.2.1-alpha.5
+# (1517a4dbca0a2789ff1d41ba439600f8547d23fa). REVIEW ON EVERY DSH UPGRADE: if
+# a preset changes upstream, regenerate these blocks or the stale restatement
+# silently wins. `tool-subagent-fork` (`subagent_fork`) stays available by
+# design. `preset-minimal` (order 3) has no delegation group and is not
+# restated.
+
+# ----------------------------------------------------------------------------
+# preset-standard restated from dsh 0.2.1-alpha.5
 
 - id: preset-standard
   name: '@deepseek-ai/dsh-agent-preset'
@@ -53,12 +56,13 @@
       - id: persona
         name: '@deepseek-ai/dsh-persona'
         config:
-          suffix: Your working directory is {{cwd}}.
           prefix: You are a coding agent powered by the {{model}} model.
       - id: agent-instructions
         name: '@deepseek-ai/dsh-agent-instructions'
         config:
           maxBytes: 65536
+      - id: time-context
+        name: '@deepseek-ai/dsh-time-context'
       - id: tool-bash
         name: '@deepseek-ai/dsh-tool-bash'
         disabled: !!js process.platform === 'win32'
@@ -73,6 +77,8 @@
           sampleOverCapGlobResults: false
       - id: tool-jobs
         name: '@deepseek-ai/dsh-tool-jobs'
+      - id: tool-schedule
+        name: '@deepseek-ai/dsh-tool-schedule'
       - id: skill-filesystem
         name: '@deepseek-ai/dsh-skill-filesystem'
       - id: tool-skill
@@ -91,7 +97,7 @@
             name: '@deepseek-ai/dsh-plan-mode'
             config:
               section: |
-                You are in plan mode. Stay in plan mode until exit_plan_mode succeeds or the user switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+                You are in plan mode. Stay in plan mode until the user approves your plan through exit_plan_mode or switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
 
                 Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
 
@@ -134,35 +140,12 @@
             config:
               provider: fork
               toolName: subagent_fork
-              backgroundMode: continuable
-          - id: tool-subagent-codex
-            name: '@deepseek-ai/dsh-tool-subagent'
-            disabled: true
-            config:
-              provider: codex
-              toolName: subagent_codex
-              backgroundMode: one-shot
-              maxDepth: provider-managed
-          - id: tool-subagent-claude-code
-            name: '@deepseek-ai/dsh-tool-subagent'
-            disabled: true
-            config:
-              provider: claude-code
-              toolName: subagent_claude_code
-              backgroundMode: one-shot
-              maxDepth: provider-managed
           - id: workflow-ptc
             name: '@deepseek-ai/dsh-workflow-ptc'
             config:
               provider: spawn
           - id: tool-workflow
             name: '@deepseek-ai/dsh-tool-workflow'
-          - id: tool-ralph
-            name: '@deepseek-ai/dsh-tool-ralph'
-            disabled: true
-            config:
-              subagentProvider: spawn
-              maxRounds: 64
       - id: tool-ask-user
         name: '@deepseek-ai/dsh-tool-ask-user'
       - id: tool-todo
@@ -179,6 +162,12 @@
       - id: tool-plugin-manager
         name: '@deepseek-ai/dsh-plugin-manager/tools'
         disabled: true
+      - id: tool-plugin-market
+        name: '@deepseek-ai/dsh-plugin-market/tools'
+        disabled: true
+
+# ----------------------------------------------------------------------------
+# preset-ptc restated from dsh 0.2.1-alpha.5
 
 - id: preset-ptc
   name: '@deepseek-ai/dsh-agent-preset'
@@ -189,12 +178,13 @@
       - id: persona
         name: '@deepseek-ai/dsh-persona'
         config:
-          suffix: Your working directory is {{cwd}}.
           prefix: You are a coding agent powered by the {{model}} model.
       - id: agent-instructions
         name: '@deepseek-ai/dsh-agent-instructions'
         config:
           maxBytes: 65536
+      - id: time-context
+        name: '@deepseek-ai/dsh-time-context'
       - id: tool-bash
         name: '@deepseek-ai/dsh-tool-bash'
         disabled: !!js process.platform === 'win32'
@@ -209,6 +199,8 @@
           sampleOverCapGlobResults: false
       - id: tool-jobs
         name: '@deepseek-ai/dsh-tool-jobs'
+      - id: tool-schedule
+        name: '@deepseek-ai/dsh-tool-schedule'
       - id: skill-filesystem
         name: '@deepseek-ai/dsh-skill-filesystem'
       - id: tool-skill
@@ -227,7 +219,7 @@
             name: '@deepseek-ai/dsh-plan-mode'
             config:
               section: |
-                You are in plan mode. Stay in plan mode until exit_plan_mode succeeds or the user switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+                You are in plan mode. Stay in plan mode until the user approves your plan through exit_plan_mode or switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
 
                 Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
 
@@ -270,23 +262,6 @@
             config:
               provider: fork
               toolName: subagent_fork
-              backgroundMode: continuable
-          - id: tool-subagent-codex
-            name: '@deepseek-ai/dsh-tool-subagent'
-            disabled: true
-            config:
-              provider: codex
-              toolName: subagent_codex
-              backgroundMode: one-shot
-              maxDepth: provider-managed
-          - id: tool-subagent-claude-code
-            name: '@deepseek-ai/dsh-tool-subagent'
-            disabled: true
-            config:
-              provider: claude-code
-              toolName: subagent_claude_code
-              backgroundMode: one-shot
-              maxDepth: provider-managed
           - id: workflow-ptc
             name: '@deepseek-ai/dsh-workflow-ptc'
             disabled: true
@@ -295,12 +270,6 @@
           - id: tool-workflow
             name: '@deepseek-ai/dsh-tool-workflow'
             disabled: true
-          - id: tool-ralph
-            name: '@deepseek-ai/dsh-tool-ralph'
-            disabled: true
-            config:
-              subagentProvider: spawn
-              maxRounds: 64
       - id: tool-ask-user
         name: '@deepseek-ai/dsh-tool-ask-user'
       - id: tool-todo
@@ -321,6 +290,12 @@
       - id: tool-plugin-manager
         name: '@deepseek-ai/dsh-plugin-manager/tools'
         disabled: true
+      - id: tool-plugin-market
+        name: '@deepseek-ai/dsh-plugin-market/tools'
+        disabled: true
+
+# ----------------------------------------------------------------------------
+# preset-cordis restated from dsh 0.2.1-alpha.5
 
 - id: preset-cordis
   name: '@deepseek-ai/dsh-agent-preset'
@@ -333,13 +308,14 @@
       - id: persona
         name: '@deepseek-ai/dsh-persona'
         config:
-          suffix: Your working directory is {{cwd}}.
           prefix: >-
             You are a coding agent powered by the {{model}} model.
       - id: agent-instructions
         name: '@deepseek-ai/dsh-agent-instructions'
         config:
           maxBytes: 65536
+      - id: time-context
+        name: '@deepseek-ai/dsh-time-context'
       - id: tool-bash
         name: '@deepseek-ai/dsh-tool-bash'
         disabled: !!js process.platform === 'win32'
@@ -354,6 +330,8 @@
           sampleOverCapGlobResults: false
       - id: tool-jobs
         name: '@deepseek-ai/dsh-tool-jobs'
+      - id: tool-schedule
+        name: '@deepseek-ai/dsh-tool-schedule'
       - id: command-goal
         name: '@deepseek-ai/dsh-command-goal'
       - id: tool-goal
@@ -368,7 +346,7 @@
             name: '@deepseek-ai/dsh-plan-mode'
             config:
               section: |
-                You are in plan mode. Stay in plan mode until exit_plan_mode succeeds or the user switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+                You are in plan mode. Stay in plan mode until the user approves your plan through exit_plan_mode or switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
 
                 Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
 
@@ -411,35 +389,12 @@
             config:
               provider: fork
               toolName: subagent_fork
-              backgroundMode: continuable
-          - id: tool-subagent-codex
-            name: '@deepseek-ai/dsh-tool-subagent'
-            disabled: true
-            config:
-              provider: codex
-              toolName: subagent_codex
-              backgroundMode: one-shot
-              maxDepth: provider-managed
-          - id: tool-subagent-claude-code
-            name: '@deepseek-ai/dsh-tool-subagent'
-            disabled: true
-            config:
-              provider: claude-code
-              toolName: subagent_claude_code
-              backgroundMode: one-shot
-              maxDepth: provider-managed
           - id: workflow-ptc
             name: '@deepseek-ai/dsh-workflow-ptc'
             config:
               provider: spawn
           - id: tool-workflow
             name: '@deepseek-ai/dsh-tool-workflow'
-          - id: tool-ralph
-            name: '@deepseek-ai/dsh-tool-ralph'
-            disabled: true
-            config:
-              subagentProvider: spawn
-              maxRounds: 64
       - id: tool-ask-user
         name: '@deepseek-ai/dsh-tool-ask-user'
       - id: tool-todo
@@ -465,3 +420,7 @@
       - id: tool-plugin-manager
         name: '@deepseek-ai/dsh-plugin-manager/tools'
         disabled: !!js "!ctx.get('profileContext')"
+      - id: tool-plugin-market
+        name: '@deepseek-ai/dsh-plugin-market/tools'
+        disabled: !!js "!ctx.get('profileContext')"
+

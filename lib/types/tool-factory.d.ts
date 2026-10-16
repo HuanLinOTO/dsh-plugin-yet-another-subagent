@@ -18,8 +18,6 @@
  * @module @huanlin/dsh-plugin-yet-another-subagent/tool-factory
  */
 import type { Context } from '@deepseek-ai/cordis';
-import type { SubagentProvider, SubagentResult, SubagentRun } from '@deepseek-ai/dsh-subagent';
-import type { JobOutcome } from '@deepseek-ai/dsh-jobs';
 import type { SubagentProfile } from './types.ts';
 /** Merge-extensible session event: child started for a tool call. */
 declare module '@deepseek-ai/dsh-session' {
@@ -31,8 +29,11 @@ declare module '@deepseek-ai/dsh-session' {
         };
     }
 }
-/** Settle pending startup without rejecting the task producer contract. */
-declare function settleStart(start: Promise<SubagentRun>, signal: AbortSignal): Promise<JobOutcome>;
+declare module '@deepseek-ai/dsh-jobs' {
+    interface JobKindMap {
+        subagent: 'subagent';
+    }
+}
 /**
  * Build the single model-facing `subagent` tool definition.
  *
@@ -41,5 +42,3 @@ declare function settleStart(start: Promise<SubagentRun>, signal: AbortSignal): 
  * @returns a `defineTool` definition ready for `ctx.tools.register`.
  */
 export declare function buildTool(profiles: readonly SubagentProfile[], ctx: Context): import("@deepseek-ai/dsh-tools").ToolDefinition;
-export { settleStart };
-export type { SubagentProvider, SubagentResult, SubagentRun, JobOutcome };

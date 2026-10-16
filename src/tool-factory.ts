@@ -23,18 +23,26 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { AgentOptions } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
-// Value import triggers `declare module 'cordis'` merge so `ctx.subagents`
-// is typed. settleRun is reused by the foreground path.
-import { settleRun } from '@deepseek-ai/dsh-subagent'
-import type { SubagentProvider, SubagentResult, SubagentRun } from '@deepseek-ai/dsh-subagent'
+// Type imports resolve the package's `declare module 'cordis'` merge so
+// `ctx.subagents` is typed (src/index.ts's value import loads the module).
+import type { SubagentActivation, SubagentResult } from '@deepseek-ai/dsh-subagent'
 import type { JobOutcome } from '@deepseek-ai/dsh-jobs'
 import type { SubagentProfile } from './types.ts'
-import { agentOptionsFor, personaForRequest, toolFilterForRequest } from './types.ts'
+import { agentOptionsFor } from './types.ts'
 
 /** Merge-extensible session event: child started for a tool call. */
 declare module '@deepseek-ai/dsh-session' {
   interface SessionEventMap {
     'ya-subagent/started': { callId: string; childId: string; profileId: string }
+  }
+}
+
+// dsh 0.2.1-alpha.5 removed the central `subagent` member from `JobKindMap`
+// (the official one-shot background path is gone); a plugin-owned job kind is
+// registered by declaration merging, matching tool-pwsh / tool-workflow.
+declare module '@deepseek-ai/dsh-jobs' {
+  interface JobKindMap {
+    subagent: 'subagent'
   }
 }
 
@@ -68,10 +76,73 @@ function stopReasonError(result: SubagentResult): string | undefined {
   }
 }
 
-/** Settle pending startup without rejecting the task producer contract. */
-async function settleStart(start: Promise<SubagentRun>, signal: AbortSignal): Promise<JobOutcome> {
+/** Flatten a child's final output blocks to text (the job result face). */
+function finalText(blocks: readonly ContentBlock[]): string {
+  return blocks
+    .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')
+    .map(block => block.text)
+    .join('')
+}
+
+/** Render a failed stop reason with optional provider-authored detail. */
+function failureDetail(result: SubagentResult): string {
+  const stopReason = result.stopReason
+  return result.diagnostic === undefined
+    ? stopReason
+    : `${stopReason}; diagnostic: ${result.diagnostic}`
+}
+
+/**
+ * Map a child result to the background-job outcome: completed carries final
+ * text, local cancellation (`aborted` without a diagnostic) is killed, and
+ * provider-diagnosed remote aborts plus every other reason are failed without
+ * partial output. Mirrors the rc.2 `settleRun` mapping that 0.2.1-alpha.5
+ * removed from `@deepseek-ai/dsh-subagent` (DSH-0.2.1-J1-05).
+ */
+function activationOutcome(result: SubagentResult): JobOutcome {
+  switch (result.stopReason) {
+    case 'completed':
+      return { status: 'completed', result: finalText(result.output) }
+    case 'aborted':
+      return result.diagnostic === undefined
+        ? { status: 'killed' }
+        : { status: 'failed', detail: failureDetail(result) }
+    case 'error':
+    case 'max-tokens':
+    case 'refusal':
+      return { status: 'failed', detail: failureDetail(result) }
+    // Merge-extensible reasons remain failures with provider-authored detail.
+    default:
+      return { status: 'failed', detail: failureDetail(result) }
+  }
+}
+
+/**
+ * Await the activation result, dispose it, then return the job outcome.
+ * Result and disposal failures become `failed`; when both fail, both details
+ * survive. Caller-delivery activations settle through `result` and release
+ * through `dispose()` (DSH-0.2.1-J1-05).
+ */
+async function settleActivation(activation: SubagentActivation): Promise<JobOutcome> {
+  let outcome: JobOutcome
   try {
-    return await settleRun(await start)
+    outcome = activationOutcome(await activation.result)
+  } catch (error: unknown) {
+    outcome = { status: 'failed', detail: String(error) }
+  }
+  try {
+    await activation.dispose()
+  } catch (error: unknown) {
+    const prefix = outcome.detail === undefined ? '' : `${outcome.detail}; `
+    return { status: 'failed', detail: `${prefix}dispose failed: ${String(error)}` }
+  }
+  return outcome
+}
+
+/** Settle pending startup without rejecting the task producer contract. */
+async function settleStart(start: Promise<SubagentActivation>, signal: AbortSignal): Promise<JobOutcome> {
+  try {
+    return await settleActivation(await start)
   } catch (error: unknown) {
     return signal.aborted
       ? { status: 'killed' }
@@ -81,24 +152,24 @@ async function settleStart(start: Promise<SubagentRun>, signal: AbortSignal): Pr
 
 type ForegroundToolResult = {
   readonly kind: 'foreground'
-  readonly runId: SubagentRun['id']
+  readonly runId: SubagentActivation['childId']
   readonly output: JsonValue[]
 }
 
-/** Collect and release one foreground run without letting disposal replace an independent result failure. */
-async function settleForegroundRun(run: SubagentRun): Promise<ForegroundToolResult> {
+/** Collect and release one caller-delivery activation without letting disposal replace an independent result failure. */
+async function settleForegroundRun(activation: SubagentActivation): Promise<ForegroundToolResult> {
   const [execution] = await Promise.allSettled([
-    run.result.then((result): ForegroundToolResult => {
+    activation.result.then((result): ForegroundToolResult => {
       const error = stopReasonError(result)
       if (error !== undefined) throw new Error(error)
       return {
         kind: 'foreground',
-        runId: run.id,
+        runId: activation.childId,
         output: result.output as unknown as JsonValue[],
       }
     }),
   ])
-  const [disposal] = await Promise.allSettled([Promise.resolve().then(() => run.dispose())])
+  const [disposal] = await Promise.allSettled([Promise.resolve().then(() => activation.dispose())])
   if (execution.status === 'rejected') {
     if (disposal.status === 'rejected') {
       throw new AggregateError(
@@ -267,23 +338,22 @@ export function buildTool(profiles: readonly SubagentProfile[], ctx: Context) {
       }
 
       const agentOptions: AgentOptions | undefined = agentOptionsFor(profile).agentOptions
-      const persona = personaForRequest(profile).persona
-      const toolFilter = toolFilterForRequest(profile).toolFilter
+      // 0.2.1-alpha.5: `label` moved to the activation spec level and the
+      // request lost `persona`/`toolFilter` (DSH-0.2.1-J1-05). Personas come
+      // from agent presets; tool filters no longer exist.
       const request = {
-        label: args.description,
         prompt: [{ type: 'text', text: args.prompt }] as ContentBlock[],
         parent,
         ...agentOptions !== undefined ? { agentOptions } : {},
-        ...persona !== undefined ? { persona } : {},
-        ...toolFilter !== undefined ? { toolFilter } : {},
         maxDepth: profile.maxDepth,
       }
 
       if (args.run_in_background === true) {
         if (profile.backgroundMode === 'one-shot') {
-          // One-shot background: the child runs inside a Job; the caller
-          // receives a job id and collects the result with `job_output`.
-          // Mirrors the official tool-subagent one-shot background path.
+          // One-shot background: the child runs inside a Job as a
+          // caller-delivery activation; the caller receives a job id and
+          // collects the result with `job_output`. Mirrors the rc.2
+          // official one-shot background path on the new start API.
           const jobs = ctx.get('jobs')
           if (jobs === undefined) {
             throw new Error('background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs')
@@ -291,11 +361,17 @@ export function buildTool(profiles: readonly SubagentProfile[], ctx: Context) {
           const id = jobs.start({
             kind: 'subagent',
             label: args.description,
-            // rc.1: `JobSpec.owner` is a durable SessionId, not the Agent.
+            // `JobSpec.owner` is a durable SessionId, not the Agent.
             owner: parent.id,
             run: () => {
               const controller = new AbortController()
-              const start = ctx.subagents.start('spawn', { ...request, signal: controller.signal })
+              const start = ctx.subagents.startActivation({
+                provider: 'spawn',
+                label: args.description,
+                request,
+                signal: controller.signal,
+                delivery: 'caller',
+              })
               // NOTE: previously appended a `ya-subagent/started` event here to
               // surface the childId early. Removed: harness persistence refuses
               // to load logs containing unknown event types unless marked
@@ -325,8 +401,10 @@ export function buildTool(profiles: readonly SubagentProfile[], ctx: Context) {
 
         // Continuable background: the child keeps its conversation; the
         // caller receives only its subagent id and sends more work via
-        // `send_message`. Mirrors the official tool-subagent default shape
-        // (base bundle sets backgroundMode: continuable).
+        // `send_message` (parent delivery notifies the model on completion —
+        // the official default). Fail loud when the spawn backend cannot host
+        // a local continuable child instead of silently degrading to an
+        // external one-shot execution.
         const spawn = ctx.subagents.getProvider('spawn')
         if (spawn === undefined) {
           throw new Error('subagent spawn provider not available; load @deepseek-ai/dsh-subagent-spawn-in-process')
@@ -335,11 +413,12 @@ export function buildTool(profiles: readonly SubagentProfile[], ctx: Context) {
           throw new Error('subagent spawn provider does not support continuable children')
         }
 
-        const started = await ctx.subagents.startContinuable({
+        const started = await ctx.subagents.startActivation({
           provider: 'spawn',
           label: args.description,
           request,
           signal: exec.signal,
+          delivery: 'parent',
         })
         // childId is embedded in the result text below; SubagentCard parses it
         // directly (no projection event needed).
@@ -350,14 +429,18 @@ export function buildTool(profiles: readonly SubagentProfile[], ctx: Context) {
         }
       }
 
-      // Default: foreground (one-shot). Collect the result and release the run.
-      const run = await ctx.subagents.start('spawn', {
-        ...request,
+      // Default: foreground (one-shot). Collect the caller-delivery result
+      // and release the activation.
+      const activation = await ctx.subagents.startActivation({
+        provider: 'spawn',
+        label: args.description,
+        request,
         signal: exec.signal,
+        delivery: 'caller',
       })
       // childId (runId) is embedded in the result text below; SubagentCard
       // parses it directly (no projection event needed).
-      const result = await settleForegroundRun(run)
+      const result = await settleForegroundRun(activation)
       return {
         kind: 'foreground' as const,
         runId: result.runId,
@@ -367,7 +450,3 @@ export function buildTool(profiles: readonly SubagentProfile[], ctx: Context) {
     },
   })
 }
-
-// Re-exports for the index module.
-export { settleStart }
-export type { SubagentProvider, SubagentResult, SubagentRun, JobOutcome }

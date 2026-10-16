@@ -20,33 +20,8 @@ export interface SubagentProfile {
         readonly model: string;
     };
     /**
-     * Persona selection. `kind: 'inherit'` omits the per-child persona so the
-     * child uses the deployment `system-prompt` persona (same as the official
-     * `tool-subagent` default when no `persona` is configured). `kind: 'custom'`
-     * shadows the deployment persona with the provided text.
+     * Maximum delegation depth (non-negative safe integer); default 1.
      */
-    readonly persona: {
-        readonly kind: 'inherit';
-    } | {
-        readonly kind: 'custom';
-        readonly text: string;
-    };
-    /**
-     * Tool filter selection. `kind: 'none'` applies no filter (child sees every
-     * visible global tool). `kind: 'allow'` keeps only the named tools;
-     * `kind: 'deny'` removes the named tools. The chosen tools are only sent to
-     * the provider when `kind` is not `'none'`.
-     */
-    readonly toolFilter: {
-        readonly kind: 'none';
-    } | {
-        readonly kind: 'allow';
-        readonly tools: readonly string[];
-    } | {
-        readonly kind: 'deny';
-        readonly tools: readonly string[];
-    };
-    /** Maximum delegation depth (non-negative safe integer); default 3. */
     readonly maxDepth: number;
     /**
      * Background policy when `run_in_background: true` is set. `'continuable'`
@@ -73,44 +48,21 @@ export interface YaSubagentConfig {
     readonly generalFixed: boolean;
 }
 /**
- * Coerce a possibly-stale profile shape (from an older `settings.yaml` or a
- * caller that still uses the legacy `persona?: string` / `toolFilter?: { allow?, deny? }`
- * form) into the current {@link SubagentProfile} shape. Idempotent on already-
- * current shapes.
+ * Coerce a possibly-stale profile shape into the current
+ * {@link SubagentProfile} shape. Idempotent on already-current shapes.
+ *
+ * Since dsh 0.2.1-alpha.5 the subagent start request no longer carries
+ * `persona` or `toolFilter` (DSH-0.2.1-J1-05), so those profile fields were
+ * removed. A stored profile that still carries them migrates by dropping the
+ * fields — personas now come from agent presets and tool filters are gone.
  *
  * Rules:
- *   - `persona: undefined | '' | null` → `{ kind: 'inherit' }`
- *   - `persona: string` (non-empty) → `{ kind: 'custom', text }`
- *   - `persona: { kind: 'inherit' }` → as-is
- *   - `persona: { kind: 'custom', text }` → as-is (text trimmed; empty → inherit)
- *   - `toolFilter: undefined | null` → `{ kind: 'none' }`
- *   - `toolFilter: { allow: [...], deny: [...] }` → allow wins if non-empty, else deny, else none
- *   - `toolFilter: { kind: 'none' | 'allow' | 'deny', tools? }` → as-is (tools defaulted to [])
  *   - `builtin: undefined | null` → `false`
  */
 export declare function migrateProfile(input: unknown): SubagentProfile;
 /** Derive agentOptions from a profile's model selection. */
 export declare function agentOptionsFor(profile: SubagentProfile): {
     readonly agentOptions?: AgentOptions;
-};
-/**
- * Project the persona field onto the request shape: `undefined` for `inherit`
- * (omit the field so the child uses the deployment persona) and the text for
- * `custom`.
- */
-export declare function personaForRequest(profile: SubagentProfile): {
-    readonly persona?: string;
-};
-/**
- * Project the toolFilter field onto the request shape: `undefined` for `none`
- * (omit the field so the child sees every visible tool) and the allow/deny
- * pair for `allow`/`deny`.
- */
-export declare function toolFilterForRequest(profile: SubagentProfile): {
-    readonly toolFilter?: {
-        readonly allow?: readonly string[];
-        readonly deny?: readonly string[];
-    };
 };
 /** Validate a profile id: lowercase letters, digits, hyphens; 1–32 chars. */
 export declare function isValidProfileId(id: string): boolean;

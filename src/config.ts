@@ -37,14 +37,6 @@ const SubagentProfileSchema = z.object({
     provider: z.string().default('').description('Provider route (only used when kind is "manual").'),
     model: z.string().default('').description('Model id (only used when kind is "manual").'),
   }).required().description('Model selection: auto inherits the parent model; manual pins a provider/model.'),
-  persona: z.object({
-    kind: z.union(['inherit', 'custom']).default('inherit'),
-    text: z.string().default(''),
-  }).default({ kind: 'inherit', text: '' }).description('Persona selection: inherit uses the deployment persona; custom shadows it with the provided text.'),
-  toolFilter: z.object({
-    kind: z.union(['none', 'allow', 'deny']).default('none'),
-    tools: z.array(z.string()).default([]),
-  }).default({ kind: 'none', tools: [] }).description('Tool filter: none applies no filter; allow keeps only the named tools; deny removes them.'),
   maxDepth: z.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_DEPTH).description('Maximum delegation depth (default 1).'),
   backgroundMode: z.union(['continuable', 'one-shot']).default('continuable').description('Background policy: continuable keeps the child conversation (send_message); one-shot returns a job id (job_output/job_kill).'),
   builtin: z.boolean().default(false).description('Whether this profile is part of the bundle seed (presentation hint only).'),
@@ -77,8 +69,6 @@ export const Config = z.object({
         id: 'general',
         label: 'General',
         model: { kind: 'auto', provider: '', model: '' },
-        persona: { kind: 'inherit', text: '' },
-        toolFilter: { kind: 'none', tools: [] },
         maxDepth: DEFAULT_MAX_DEPTH,
         backgroundMode: 'continuable',
         builtin: true,
